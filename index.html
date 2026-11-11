@@ -1,0 +1,2055 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Home Court</title>
+<meta name="description" content="Mixed reality squash for Meta Quest 3 and 3S. The headset finds the walls in your room and the ball bounces off them.">
+<meta property="og:title" content="Home Court">
+<meta property="og:description" content="Squash against your own wall, in mixed reality on Meta Quest 3 and 3S.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23d4ee3c'/%3E%3Cpath d='M4 12c6 3 18 3 24-2M4 21c7-4 17-3 24 2' stroke='%23fff' stroke-width='2' fill='none'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: product page. Slim top bar, two-column hero (pitch, setup and play buttons | live demo of the court), then controls, steps and rules. */
+:root {
+  --bg: #f3f4f5;
+  --surface: #ffffff;
+  --fg: #111316;
+  --muted: #5b616b;
+  --line: #dcdfe3;
+  --accent: #e3462a;
+  --ok: #2fa463;
+  --display: "Archivo", "Arial Narrow", system-ui, sans-serif;
+  --body: "Inter", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1113;
+    --surface: #171a1d;
+    --fg: #eef0f2;
+    --muted: #9aa1aa;
+    --line: #2a2e34;
+    --accent: #ff6a4a;
+    --ok: #46c27e;
+    color-scheme: dark;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--fg); }
+body { font-family: var(--body); font-size: 16px; line-height: 1.55; -webkit-font-smoothing: antialiased; }
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-block: 20px 56px;
+  padding-left: max(20px, env(safe-area-inset-left, 0px));
+  padding-right: max(20px, env(safe-area-inset-right, 0px));
+}
+.bar { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
+.mark { font-family: var(--display); font-weight: 800; font-variation-settings: "wdth" 125; font-size: 18px; display: flex; align-items: center; gap: 10px; }
+.mark i { width: 12px; height: 12px; border-radius: 50%; background: #d4ee3c; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.25); display: inline-block; }
+.bar small { color: var(--muted); font-size: 13px; }
+
+.hero { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; align-items: start; padding-block: 44px 52px; }
+@media (max-width: 900px) { .hero { grid-template-columns: 1fr; gap: 28px; padding-block: 28px 40px; } }
+h1 {
+  font-family: var(--display); font-weight: 800; font-variation-settings: "wdth" 112;
+  font-size: clamp(40px, 5.6vw, 66px); line-height: 0.98; letter-spacing: -0.015em; margin: 0 0 18px; text-wrap: balance;
+}
+.lede { color: var(--muted); font-size: 18px; max-width: 46ch; margin: 0 0 26px; }
+
+.setup { display: grid; gap: 14px; margin-bottom: 22px; }
+.seg { border: 0; margin: 0; padding: 0; min-width: 0; display: grid; gap: 6px; }
+.seg legend { font-size: 12px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); padding: 0; margin-bottom: 6px; }
+.seg .opts { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); width: fit-content; max-width: 100%; }
+.seg label { position: relative; cursor: pointer; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { display: block; padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--muted); transition: background 0.15s ease, color 0.15s ease; }
+.seg input:checked + span { background: var(--fg); color: var(--bg); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.seg-note { margin: 0; font-size: 14px; color: var(--muted); max-width: 52ch; }
+.swatches { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.swatches label:not(.check) { position: relative; cursor: pointer; width: 34px; height: 34px; }
+.swatches label:not(.check) input { position: absolute; inset: 0; opacity: 0; margin: 0; cursor: pointer; }
+.swatches label:not(.check) span { display: block; width: 34px; height: 34px; border-radius: 50%; background: var(--sw); box-shadow: inset 0 0 0 1px rgba(0,0,0,0.18); transition: transform 0.15s ease; }
+.swatches input:checked + span { box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--fg); }
+.swatches input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 4px; }
+.swatches .check { font-size: 14px; color: var(--muted); display: flex; align-items: center; gap: 8px; margin-left: 6px; cursor: pointer; }
+.swatches .check input { width: 18px; height: 18px; accent-color: var(--fg); }
+.stage-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.stage-row figcaption { flex: 1 1 260px; min-width: 0; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+button {
+  font: 600 16px/1 var(--body); border-radius: 999px; padding: 15px 24px; cursor: pointer;
+  border: 1px solid var(--fg); background: var(--fg); color: var(--bg); transition: transform 0.15s ease, opacity 0.15s ease;
+}
+button.ghost { background: transparent; color: var(--fg); border-color: var(--line); }
+button.small { padding: 9px 14px; font-size: 14px; }
+button:hover:not(:disabled) { transform: translateY(-1px); }
+button:disabled { opacity: 0.35; cursor: not-allowed; }
+button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+#status { margin: 16px 0 0; font-size: 14px; color: var(--muted); max-width: 52ch; display: flex; gap: 10px; align-items: baseline; }
+#status::before { content: ""; flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--muted); transform: translateY(-1px); }
+#status.ok::before { background: var(--ok); }
+
+.send { margin-top: 22px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); display: grid; gap: 10px; }
+.send b { font-weight: 600; }
+.send p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.url { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; min-width: 0; }
+.url code { font: 600 15px/1.4 ui-monospace, "Cascadia Mono", Consolas, monospace; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; overflow-wrap: anywhere; min-width: 0; flex: 1 1 220px; user-select: all; }
+
+.stage { margin: 0; display: grid; gap: 10px; min-width: 0; position: sticky; top: 20px; }
+@media (max-width: 900px) { .stage { position: static; } }
+.view { position: relative; aspect-ratio: 4 / 3; max-width: 100%; border-radius: 18px; overflow: hidden; background: #d9dbde; border: 1px solid var(--line); }
+.view canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: pointer; }
+.view canvas:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.chip { position: absolute; top: 12px; left: 12px; font: 600 12px/1 var(--body); letter-spacing: 0.08em; text-transform: uppercase; color: #111316; background: rgba(255,255,255,0.88); border-radius: 999px; padding: 7px 10px; pointer-events: none; display: flex; gap: 6px; align-items: center; }
+.chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: #e3462a; }
+.stage figcaption { font-size: 13px; color: var(--muted); }
+
+section h2 { font-family: var(--display); font-weight: 700; font-size: 13px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin: 0 0 18px; }
+.block { padding-block: 36px; border-top: 1px solid var(--line); }
+.steps { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px; counter-reset: s; }
+.steps li { counter-increment: s; min-width: 0; }
+.steps li::before { content: counter(s); font-family: var(--display); font-weight: 800; font-variation-settings: "wdth" 125; font-size: 15px; display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); margin-bottom: 12px; }
+.steps b { display: block; font-weight: 600; margin-bottom: 4px; }
+.steps p { margin: 0; color: var(--muted); }
+
+.grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; margin: 0; }
+.grid.four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.grid div { background: var(--surface); padding: 18px 20px; min-width: 0; }
+.grid dt { font-weight: 600; margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+.grid dt .sw { width: 18px; height: 3px; border-radius: 2px; background: var(--accent); }
+.grid dt kbd { font: 600 12px/1 var(--body); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px; padding: 4px 7px; background: var(--bg); }
+.grid dd { margin: 0; color: var(--muted); font-size: 15px; }
+.note { margin: 22px 0 0; font-size: 14px; color: var(--muted); max-width: 72ch; }
+@media (max-width: 900px) { .grid.four { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 760px) {
+  .steps, .grid, .grid.four { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { button, .seg span { transition: none; } }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <header class="bar">
+    <div class="mark"><i aria-hidden="true"></i>Home Court</div>
+    <small>Mixed reality for Meta Quest 3 and 3S</small>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1>Squash against your own wall.</h1>
+      <p class="lede">Your headset finds the real walls in your room. Pick one, and it becomes the front wall of a squash court. The ball bounces off your actual walls, floor and furniture.</p>
+
+      <div class="setup">
+        <fieldset class="seg">
+          <legend>Mode</legend>
+          <div class="opts">
+            <label><input type="radio" name="mode" value="rally" id="mode-rally"><span>Rally</span></label>
+            <label><input type="radio" name="mode" value="attack" id="mode-attack"><span>Target attack</span></label>
+          </div>
+        </fieldset>
+        <fieldset class="seg">
+          <legend>Level</legend>
+          <div class="opts">
+            <label><input type="radio" name="level" value="casual" id="level-casual"><span>Casual</span></label>
+            <label><input type="radio" name="level" value="club" id="level-club"><span>Club</span></label>
+            <label><input type="radio" name="level" value="pro" id="level-pro"><span>Pro</span></label>
+          </div>
+        </fieldset>
+        <p class="seg-note" id="seg-note"></p>
+        <fieldset class="seg">
+          <legend>Court size</legend>
+          <div class="opts">
+            <label><input type="radio" name="size" value="small" id="size-small"><span>Small</span></label>
+            <label><input type="radio" name="size" value="medium" id="size-medium"><span>Medium</span></label>
+            <label><input type="radio" name="size" value="large" id="size-large"><span>Large</span></label>
+            <label><input type="radio" name="size" value="wall" id="size-wall"><span>Whole wall</span></label>
+          </div>
+        </fieldset>
+        <p class="seg-note" id="size-note"></p>
+        <fieldset class="seg">
+          <legend>Court colour</legend>
+          <div class="swatches">
+            <label title="Coral"><input type="radio" name="color" value="coral" id="color-coral"><span style="--sw:#e3462a"></span></label>
+            <label title="Cyan"><input type="radio" name="color" value="cyan" id="color-cyan"><span style="--sw:#1fb6d1"></span></label>
+            <label title="Violet"><input type="radio" name="color" value="violet" id="color-violet"><span style="--sw:#7c5cff"></span></label>
+            <label title="Pink"><input type="radio" name="color" value="pink" id="color-pink"><span style="--sw:#ff4f9a"></span></label>
+            <label title="White"><input type="radio" name="color" value="white" id="color-white"><span style="--sw:#f4f4f4"></span></label>
+            <label class="check"><input type="checkbox" id="tint"> Paint the court area on the wall</label>
+          </div>
+        </fieldset>
+      </div>
+
+      <div class="actions">
+        <button id="btn-ar" disabled>Play in your room</button>
+        <button id="btn-vr" class="ghost" disabled>Play in VR</button>
+      </div>
+      <p id="status">Checking for a headset…</p>
+
+      <div class="send" id="send">
+        <div><b>Play it on your Quest</b><p>Put the headset on, open the Meta Quest Browser and type this address:</p></div>
+        <div class="url"><code id="url"></code><button class="ghost small" id="copy">Copy</button></div>
+      </div>
+    </div>
+
+    <figure class="stage">
+      <div class="view" id="stage"><span class="chip" id="demo-chip">Demo</span></div>
+      <div class="stage-row">
+        <figcaption id="caption">A demo rally is playing. Move the mouse over it to take over: aim with the mouse, click or press Space to swing. In the headset you see your own room instead of this one.</figcaption>
+        <button class="ghost small" id="new-ball">New ball</button>
+      </div>
+    </figure>
+  </section>
+
+  <section class="block" aria-labelledby="h-steps">
+    <h2 id="h-steps">Get playing</h2>
+    <ol class="steps">
+      <li><b>Open this page on your Quest</b><p>Use the Meta Quest Browser. Pick a mode and level, press "Play in your room", and allow access to your room when the headset asks.</p></li>
+      <li><b>Choose your wall</b><p>Point a controller at a clear wall. The court lines appear on it. Pull the trigger to play there.</p></li>
+      <li><b>Hit the ball at the wall</b><p>A ball floats in front of you. Swing through it to serve, then keep the rally going.</p></li>
+    </ol>
+  </section>
+
+  <section class="block" aria-labelledby="h-controls">
+    <h2 id="h-controls">Controls</h2>
+    <dl class="grid">
+      <div><dt>Swing</dt><dd>Each controller holds a bat. Swing harder to hit harder.</dd></div>
+      <div><dt><kbd>Trigger</kbd></dt><dd>Pick the wall, choose in the menu, or start a new game.</dd></div>
+      <div><dt><kbd>A</kbd> or <kbd>X</kbd></dt><dd>New ball in front of you, any time.</dd></div>
+      <div><dt><kbd>B</kbd> or <kbd>Y</kbd></dt><dd>Open the menu: new ball, court size, colour, mode, level, another wall.</dd></div>
+      <div><dt>Thumbstick</dt><dd>Left and right: court width. Up and down: court height.</dd></div>
+      <div><dt>Draw the court</dt><dd>In the menu, choose "Draw the court". Point at one corner, hold the trigger, drag to the opposite corner and let go.</dd></div>
+      <div><dt>Whole wall</dt><dd>Pick "Whole wall" as the court size, or turn on "Fill the whole wall" in the menu.</dd></div>
+      <div><dt>Bare hands</dt><dd>Put the controllers down. Hit with your open palm. Quick pinch: new ball. Pinch and hold: menu.</dd></div>
+    </dl>
+    <p class="note">The Quest's own ≡ button belongs to the headset, so web games cannot use it. The game pauses while the Quest menu is open and shows its own menu when you come back.</p>
+  </section>
+
+  <section class="block" aria-labelledby="h-rules">
+    <h2 id="h-rules">The rules</h2>
+    <dl class="grid">
+      <div><dt>Score</dt><dd>Your shot reaches the front wall: 1 point, times your multiplier.</dd></div>
+      <div><dt>Multiplier</dt><dd>Every 4 returns in a row adds ×1, up to ×4. A lost ball resets it.</dd></div>
+      <div><dt><span class="sw" aria-hidden="true"></span>The tin</dt><dd>The low line on the wall. Hit below it and you lose the ball.</dd></div>
+      <div><dt>Bounces</dt><dd>Hit the ball before it bounces twice. Casual lets it bounce twice before you must hit it.</dd></div>
+      <div><dt>Out lines</dt><dd>Keep your shot inside the side lines and under the top line.</dd></div>
+      <div><dt>Target</dt><dd>Hit the ring for a bonus: 3 points in Rally, 5 in Target attack, times your multiplier.</dd></div>
+    </dl>
+    <p class="note">The game uses your Quest's Space Setup to find walls, the floor and tables. If your room has not been set up, you play against a virtual wall placed where you point. Clear the space around you before you swing.</p>
+  </section>
+</main>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const DEBUG = new URLSearchParams(location.search).has('debug');
+
+// ---------- storage (can be blocked; never required) ----------
+const store = {
+  get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* storage blocked */ } },
+};
+
+// ---------- settings ----------
+const LEVELS = {
+  casual: { grav: 3.6, bounces: 2, assist: 2, note: 'Casual: weak shots are guided to the wall and the ball may bounce twice.' },
+  club:   { grav: 4.4, bounces: 1, assist: 1, note: 'Club: real bounce rules, with a little lift on weak shots.' },
+  pro:    { grav: 5.6, bounces: 1, assist: 0, note: 'Pro: pure physics. No help at all.' },
+};
+const MODES = {
+  rally:  { label: 'Rally', note: 'Rally: 3 balls. Keep it going as long as you can.' },
+  attack: { label: 'Target attack', note: 'Target attack: 60 seconds and endless balls. Targets are worth 5.' },
+};
+const ATTACK_TIME = 60;
+const settings = { mode: store.get('hc-mode', 'rally'), level: store.get('hc-level', 'casual') };
+if (!MODES[settings.mode]) settings.mode = 'rally';
+if (!LEVELS[settings.level]) settings.level = 'casual';
+const lvl = () => LEVELS[settings.level];
+
+// court size (width and top-line height in metres) and colour
+// "wall" stretches the court over the whole wall; its w/h are only a fallback
+const SIZES = { small: { w: 1.6, h: 1.6 }, medium: { w: 2.6, h: 2.0 }, large: { w: 3.4, h: 2.4 }, wall: { w: 3.4, h: 2.4 } };
+const COLORS = { coral: 0xe3462a, cyan: 0x1fb6d1, violet: 0x7c5cff, pink: 0xff4f9a, white: 0xf4f4f4 };
+settings.size = store.get('hc-size', 'medium');
+settings.color = store.get('hc-color', 'coral');
+settings.tint = store.get('hc-tint', '0') === '1';
+if (!SIZES[settings.size] && settings.size !== 'custom') settings.size = 'medium';
+if (!COLORS[settings.color]) settings.color = 'coral';
+const court = {
+  w: parseFloat(store.get('hc-w', '')) || SIZES[settings.size === 'custom' ? 'medium' : settings.size].w,
+  h: parseFloat(store.get('hc-h', '')) || SIZES[settings.size === 'custom' ? 'medium' : settings.size].h,
+};
+court.w = THREE.MathUtils.clamp(court.w, 1.0, 4.0);
+court.h = THREE.MathUtils.clamp(court.h, 1.2, 2.6);
+court.fill = settings.size === 'wall';
+
+// ---------- tuning ----------
+const R = 0.04;              // ball radius (m)
+const E_WALL = 0.82, E_FLOOR = 0.7, E_PAD = 0.55;
+const MAX_SPEED = 9;
+const TIN = 0.22;            // tin line height above the floor
+const BR = 0.08, BT = 0.007; // bat blade radius, half thickness
+const TARGET_R = 0.17;
+const SERVE_MIN_SPEED = 0.6; // a resting bat does not serve by accident
+const UP = new THREE.Vector3(0, 1, 0);
+const Z_AXIS = new THREE.Vector3(0, 0, 1);
+const ACCENT = 0xe3462a, BALL = 0xd4ee3c;
+
+const stage = document.getElementById('stage');
+const statusEl = document.getElementById('status');
+const btnAR = document.getElementById('btn-ar');
+const btnVR = document.getElementById('btn-vr');
+const demoChip = document.getElementById('demo-chip');
+
+// ---------- renderer ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: DEBUG });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.setClearColor(0x000000, 0);
+renderer.xr.enabled = true;
+renderer.xr.setReferenceSpaceType('local-floor');
+renderer.domElement.tabIndex = 0;
+renderer.domElement.setAttribute('aria-label', 'Squash court preview. Move the mouse to aim, click or press Space to swing.');
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8a8f99, 0.5));
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.3);
+keyLight.position.set(1.5, 3, 1);
+scene.add(keyLight);
+
+const camera = new THREE.PerspectiveCamera(50, 4 / 3, 0.02, 60);
+camera.position.set(0.3, 1.6, 1.25);
+camera.lookAt(0, 1.1, -2.6);
+
+// scratch vectors (each function documents which it uses; never held across calls)
+const T = {};
+'abcdefghijk'.split('').forEach((k) => { T[k] = new THREE.Vector3(); });
+
+// ---------- preview room (desktop and VR only; hidden in mixed reality) ----------
+const ROOM = { w: 3.6, front: -2.6, back: 2.2, h: 2.7 };
+const room = new THREE.Group();
+scene.add(room);
+
+function plankTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 512;
+  const x = c.getContext('2d');
+  x.fillStyle = '#b89c7c'; x.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 8; i++) {
+    const shade = 180 + ((i * 37) % 18);
+    x.fillStyle = `rgb(${shade},${shade - 30},${shade - 62})`;
+    x.fillRect(i * 64 + 1, 0, 62, 512);
+    x.fillStyle = 'rgba(60,40,20,0.35)';
+    x.fillRect(i * 64, 0, 1, 512);
+    x.fillRect(i * 64, (i * 197) % 512, 64, 1);
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 3);
+  t.anisotropy = 4;
+  return t;
+}
+const wallMat = new THREE.MeshStandardMaterial({ color: 0xe6e7e9, roughness: 0.95 });
+const floorMat = new THREE.MeshStandardMaterial({ map: plankTexture(), roughness: 0.7 });
+const trimMat = new THREE.MeshStandardMaterial({ color: 0xfafafa, roughness: 0.6 });
+function roomPlane(w, h, mat, pos, rot) {
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), mat);
+  m.position.copy(pos); m.rotation.set(rot[0], rot[1], rot[2]);
+  room.add(m);
+}
+const depth = ROOM.back - ROOM.front, midZ = (ROOM.back + ROOM.front) / 2;
+roomPlane(ROOM.w, depth, floorMat, new THREE.Vector3(0, 0, midZ), [-Math.PI / 2, 0, 0]);
+roomPlane(ROOM.w, ROOM.h, wallMat, new THREE.Vector3(0, ROOM.h / 2, ROOM.front), [0, 0, 0]);
+roomPlane(depth, ROOM.h, wallMat, new THREE.Vector3(-ROOM.w / 2, ROOM.h / 2, midZ), [0, Math.PI / 2, 0]);
+roomPlane(depth, ROOM.h, wallMat, new THREE.Vector3(ROOM.w / 2, ROOM.h / 2, midZ), [0, -Math.PI / 2, 0]);
+roomPlane(ROOM.w, ROOM.h, wallMat, new THREE.Vector3(0, ROOM.h / 2, ROOM.back), [0, Math.PI, 0]);
+roomPlane(ROOM.w, depth, new THREE.MeshStandardMaterial({ color: 0xf2f3f4, emissive: 0xd8dadd, emissiveIntensity: 0.55, roughness: 1 }), new THREE.Vector3(0, ROOM.h, midZ), [Math.PI / 2, 0, 0]);
+const roomFill = new THREE.PointLight(0xffffff, 2.2, 0, 1.2);
+roomFill.position.set(0, ROOM.h - 0.3, -0.4);
+room.add(roomFill);
+[[ROOM.w, new THREE.Vector3(0, 0.04, ROOM.front + 0.006), 0],
+ [depth, new THREE.Vector3(-ROOM.w / 2 + 0.006, 0.04, midZ), Math.PI / 2],
+ [depth, new THREE.Vector3(ROOM.w / 2 - 0.006, 0.04, midZ), Math.PI / 2]].forEach(([len, pos, ry]) => {
+  const b = new THREE.Mesh(new THREE.BoxGeometry(len, 0.08, 0.012), trimMat);
+  b.position.copy(pos); b.rotation.y = ry; room.add(b);
+});
+
+// ---------- colliders ----------
+// A collider is a rectangle: local Y is its normal, X/Z span the surface.
+function rectFrom(center, normal, u, hw, hh) {
+  const n = normal.clone().normalize(), x = u.clone().normalize();
+  const z = new THREE.Vector3().crossVectors(x, n);
+  const m = new THREE.Matrix4().makeBasis(x, n, z).setPosition(center);
+  return finishRect({ m, minX: -hw, maxX: hw, minZ: -hh, maxZ: hh, plane: null });
+}
+function finishRect(r) {
+  r.inv = r.m.clone().invert();
+  r.nW = new THREE.Vector3(0, 1, 0).transformDirection(r.m);
+  r.h = new THREE.Vector3().setFromMatrixPosition(r.m).y;
+  r.vertical = Math.abs(r.nW.y) < 0.5;
+  r.up = r.nW.y > 0.9;
+  r.front = false;
+  return r;
+}
+const virtualColliders = [
+  rectFrom(new THREE.Vector3(0, ROOM.h / 2, ROOM.front), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), ROOM.w / 2, ROOM.h / 2),
+  rectFrom(new THREE.Vector3(-ROOM.w / 2, ROOM.h / 2, midZ), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1), depth / 2, ROOM.h / 2),
+  rectFrom(new THREE.Vector3(ROOM.w / 2, ROOM.h / 2, midZ), new THREE.Vector3(-1, 0, 0), new THREE.Vector3(0, 0, 1), depth / 2, ROOM.h / 2),
+  rectFrom(new THREE.Vector3(0, ROOM.h / 2, ROOM.back), new THREE.Vector3(0, 0, -1), new THREE.Vector3(-1, 0, 0), ROOM.w / 2, ROOM.h / 2),
+  rectFrom(new THREE.Vector3(0, ROOM.h, midZ), new THREE.Vector3(0, -1, 0), new THREE.Vector3(1, 0, 0), ROOM.w / 2, depth / 2),
+];
+virtualColliders[0].front = true;
+let colliders = virtualColliders.slice();
+let floorY = 0;
+
+// The front wall: O is the bottom centre of the court zone, n faces the player, u runs along the wall to the right.
+function makeFront(O, n, hw, top, plane) {
+  const u = new THREE.Vector3().crossVectors(n.clone().negate(), UP).normalize();
+  const center = O.clone(); center.y = floorY + top / 2;
+  const rect = rectFrom(center, n, u, hw + 0.5, top / 2);  // stands in if the real wall drops out of the scan
+  rect.front = true;
+  // wallMin/wallMax: how far the wall itself reaches left/right of O (for drawing the court)
+  return { O: O.clone(), n: n.clone(), u, hw, top, plane, rect, wallMin: -(hw + 0.5), wallMax: hw + 0.5 };
+}
+function makeVirtualFront() {
+  const edge = ROOM.w / 2 - 0.05;
+  const f = makeFront(new THREE.Vector3(0, 0, ROOM.front), new THREE.Vector3(0, 0, 1), court.fill ? edge : Math.min(court.w / 2, edge), ROOM.h, null);
+  f.wallMin = -edge; f.wallMax = edge;
+  return f;
+}
+let front = makeVirtualFront();
+
+// ---------- court markings, target and score board ----------
+const courtColor = new THREE.Color(COLORS[settings.color]);
+const colorMats = [];   // target materials that follow the chosen court colour
+function lineMat(color, opacity) {
+  return new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, toneMapped: false, polygonOffset: true, polygonOffsetFactor: -2 });
+}
+function courtMat(opacity) { const m = lineMat(courtColor, opacity); colorMats.push(m); return m; }
+const target = new THREE.Group();
+target.add(new THREE.Mesh(new THREE.RingGeometry(TARGET_R - 0.014, TARGET_R, 64), courtMat(1)));
+target.add(new THREE.Mesh(new THREE.RingGeometry(TARGET_R * 0.5 - 0.01, TARGET_R * 0.5, 48), courtMat(0.9)));
+target.add(new THREE.Mesh(new THREE.CircleGeometry(0.022, 24), courtMat(1)));
+target.add(new THREE.Mesh(new THREE.CircleGeometry(TARGET_R, 64), courtMat(0.08)));
+
+const hudCanvas = document.createElement('canvas');
+hudCanvas.width = 1024; hudCanvas.height = 352;
+const hctx = hudCanvas.getContext('2d');
+const hudTex = new THREE.CanvasTexture(hudCanvas);
+hudTex.colorSpace = THREE.SRGBColorSpace;
+hudTex.anisotropy = 4;
+const hud = new THREE.Mesh(new THREE.PlaneGeometry(1.1, 1.1 * 352 / 1024), new THREE.MeshBasicMaterial({ map: hudTex, transparent: true, depthWrite: false, toneMapped: false }));
+
+const glassWall = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, transparent: true, opacity: 0.16, roughness: 0.15, depthWrite: false, side: THREE.DoubleSide }));
+glassWall.visible = false;
+
+let marks = null;
+function buildMarkings(f) {
+  if (marks) {
+    marks.traverse((o) => { if (o.userData.strip) { o.geometry.dispose(); o.material.dispose(); } });
+    scene.remove(marks);
+  }
+  const g = new THREE.Group();
+  g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(f.u, UP, f.n));
+  g.position.copy(f.O).addScaledVector(f.n, 0.008);
+  g.position.y = floorY;
+  const ztop = Math.max(TIN + 0.9, Math.min(court.fill ? f.top - 0.12 : court.h, f.top - 0.1));
+  const strip = (w, h, x, y, opacity) => {
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), lineMat(courtColor, opacity));
+    m.position.set(x, y, 0); m.userData.strip = true; g.add(m);
+  };
+  if (settings.tint) strip(2 * f.hw, ztop - TIN, 0, (ztop + TIN) / 2, 0.16);   // paints the court area
+  strip(2 * f.hw, 0.03, 0, TIN, 1);                                   // tin
+  strip(2 * f.hw, 0.014, 0, ztop, 0.9);                               // out line
+  strip(0.014, ztop - TIN, -f.hw, (ztop + TIN) / 2, 0.75);            // side lines
+  strip(0.014, ztop - TIN, f.hw, (ztop + TIN) / 2, 0.75);
+  g.add(target);
+  g.add(hud);
+  // the score board sits above the court, or just inside its top edge when the court reaches the ceiling
+  const roomAbove = f.top - ztop > 0.5;
+  hud.position.set(0, roomAbove ? ztop + 0.26 : ztop - 0.3, 0.012);
+  if (!f.plane && mode === 'ar') {
+    glassWall.visible = true;
+    glassWall.scale.set(2 * f.hw + 0.6, f.top, 1);
+    glassWall.position.set(0, f.top / 2, -0.004);
+    g.add(glassWall);
+  } else {
+    glassWall.visible = false;
+  }
+  g.userData = { hw: f.hw, ztop };
+  scene.add(g);
+  g.updateMatrixWorld(true);
+  marks = g;
+  // keep the target inside the new zone
+  if (Math.abs(target.position.x) > f.hw - 0.25 || target.position.y > ztop - 0.2 || target.position.y < TIN + 0.3) moveTarget();
+}
+function moveTarget() {
+  if (!marks) return;
+  const { hw, ztop } = marks.userData;
+  const old = target.position.clone();
+  for (let i = 0; i < 6; i++) {   // move it somewhere noticeably different
+    target.position.set(THREE.MathUtils.randFloat(-hw + 0.3, hw - 0.3), THREE.MathUtils.randFloat(TIN + 0.35, ztop - 0.25), 0.002);
+    if (target.position.distanceTo(old) > 0.5) break;
+  }
+}
+
+// ---------- ball ----------
+function ballTexture() {
+  const c = document.createElement('canvas');
+  c.width = 512; c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = '#d4ee3c'; x.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 2400; i++) {
+    x.fillStyle = i % 2 ? 'rgba(255,255,255,0.10)' : 'rgba(80,90,0,0.08)';
+    x.fillRect((i * 97) % 512, (i * 53) % 256, 2, 2);
+  }
+  x.strokeStyle = 'rgba(255,255,255,0.95)';
+  x.lineWidth = 9;
+  x.beginPath();
+  for (let i = 0; i <= 512; i += 4) {
+    const y = 128 + 70 * Math.sin((i / 512) * Math.PI * 4);
+    if (i === 0) x.moveTo(i, y); else x.lineTo(i, y);
+  }
+  x.stroke();
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const ballVel = new THREE.Vector3();
+const ballPos = new THREE.Vector3(0, 1.15, -0.3);
+const prevPos = new THREE.Vector3();
+const ball = new THREE.Mesh(
+  new THREE.SphereGeometry(R, 32, 20),
+  new THREE.MeshStandardMaterial({ map: ballTexture(), roughness: 0.75, emissive: BALL, emissiveIntensity: 0.12 })
+);
+scene.add(ball);
+
+function shadowTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  const gr = x.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, 'rgba(0,0,0,0.55)');
+  gr.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+const shadow = new THREE.Mesh(new THREE.PlaneGeometry(R * 5, R * 5), new THREE.MeshBasicMaterial({ map: shadowTexture(), transparent: true, depthWrite: false }));
+shadow.rotation.x = -Math.PI / 2;
+scene.add(shadow);
+
+// where the ball will land next: a depth cue that is hard to judge in passthrough
+const marker = new THREE.Mesh(new THREE.RingGeometry(0.05, 0.066, 40), new THREE.MeshBasicMaterial({ color: BALL, transparent: true, opacity: 0.7, depthWrite: false, toneMapped: false }));
+marker.rotation.x = -Math.PI / 2;
+marker.visible = false;
+scene.add(marker);
+
+// impact ripples
+const ripples = [];
+const rippleGeo = new THREE.RingGeometry(0.85, 1, 48);
+function ripple(pos, normal, color, size = 0.06, life = 0.45) {
+  const m = new THREE.Mesh(rippleGeo, new THREE.MeshBasicMaterial({ color, transparent: true, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+  m.position.copy(pos).addScaledVector(normal, 0.01);
+  m.quaternion.setFromUnitVectors(Z_AXIS, normal);
+  m.scale.setScalar(size * 0.4);
+  scene.add(m);
+  ripples.push({ m, t: 0, size, life });
+}
+function updateRipples(dt) {
+  for (let i = ripples.length - 1; i >= 0; i--) {
+    const r = ripples[i];
+    r.t += dt;
+    const k = Math.min(1, r.t / r.life);
+    r.m.scale.setScalar(r.size * (0.4 + k * 2.2));
+    r.m.material.opacity = 1 - k;
+    if (k >= 1) { scene.remove(r.m); r.m.material.dispose(); ripples.splice(i, 1); }
+  }
+}
+
+// floating "+1" style score pop-ups
+const popups = [];
+const popTex = new Map();
+function popTexture(text, color) {
+  const key = text + color;
+  if (popTex.has(key)) return popTex.get(key);
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 128;
+  const x = c.getContext('2d');
+  x.font = "800 88px Archivo, 'Arial Narrow', sans-serif";
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.lineWidth = 10; x.strokeStyle = 'rgba(16,18,21,0.75)';
+  x.strokeText(text, 128, 66);
+  x.fillStyle = color; x.fillText(text, 128, 66);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  popTex.set(key, t);
+  return t;
+}
+function popup(text, pos, color = '#ffffff', big = false) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: popTexture(text, color), transparent: true, depthWrite: false, toneMapped: false }));
+  const k = big ? 1.6 : 1;
+  s.scale.set(0.22 * k, 0.11 * k, 1);
+  s.position.copy(pos);
+  scene.add(s);
+  popups.push({ s, t: 0 });
+}
+function updatePopups(dt) {
+  for (let i = popups.length - 1; i >= 0; i--) {
+    const p = popups[i];
+    p.t += dt;
+    p.s.position.y += dt * 0.3;
+    p.s.material.opacity = Math.max(0, 1 - p.t / 1.0);
+    if (p.t >= 1.0) { scene.remove(p.s); p.s.material.dispose(); popups.splice(i, 1); }
+  }
+}
+
+// ---------- bats ----------
+function makePaddle() {
+  const group = new THREE.Group();
+  const holder = new THREE.Group();          // blade frame: its local X axis is the face normal
+  holder.position.set(0, 0.03, -0.15);
+  group.add(holder);
+  const wood = new THREE.MeshStandardMaterial({ color: 0xc9a273, roughness: 0.55 });
+  const core = new THREE.Mesh(new THREE.CylinderGeometry(BR, BR, 0.006, 48), wood);
+  core.rotation.z = Math.PI / 2;
+  holder.add(core);
+  const red = new THREE.Mesh(new THREE.CylinderGeometry(BR - 0.002, BR - 0.002, 0.004, 48), new THREE.MeshStandardMaterial({ color: 0xb3162a, roughness: 0.75 }));
+  red.rotation.z = Math.PI / 2; red.position.x = 0.005; holder.add(red);
+  const black = new THREE.Mesh(new THREE.CylinderGeometry(BR - 0.002, BR - 0.002, 0.004, 48), new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.8 }));
+  black.rotation.z = Math.PI / 2; black.position.x = -0.005; holder.add(black);
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.016, 0.1, 20), wood);
+  handle.rotation.x = Math.PI / 2;
+  handle.position.set(0, 0.015, -0.03);
+  group.add(handle);
+  return {
+    group, holder, batHolder: holder, r: BR, t: BT, grip: null, ctrl: null,
+    prev: new THREE.Vector3(), vel: new THREE.Vector3(), cd: 0, source: null, ready: false, on: false,
+    poseVel: false, pressT: -1, hand: '', isHand: false, tracked: true, aPrev: false, bPrev: false,
+  };
+}
+
+// bare hands: the open palm is the bat. Its frame is rebuilt every frame from the hand joints.
+const PALM_R = 0.09, PALM_T = 0.02;
+function makePalm() {
+  const palm = new THREE.Group();
+  palm.matrixAutoUpdate = false;
+  const holder = new THREE.Group();        // local X is the palm normal, like the bat blade
+  palm.add(holder);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(PALM_R, 0.004, 8, 48), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, toneMapped: false }));
+  ring.rotation.y = Math.PI / 2;
+  holder.add(ring);
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(PALM_R, 40), new THREE.MeshBasicMaterial({ color: BALL, transparent: true, opacity: 0.12, depthWrite: false, side: THREE.DoubleSide, toneMapped: false }));
+  disc.rotation.y = Math.PI / 2;
+  holder.add(disc);
+  palm.visible = false;
+  return { palm, holder };
+}
+const palmM = new THREE.Matrix4();
+const PV = { a: new THREE.Vector3(), b: new THREE.Vector3(), c: new THREE.Vector3(), d: new THREE.Vector3() };
+function updatePalm(p) {
+  const j = p.handObj && p.handObj.joints;
+  const W = j && j['wrist'], I = j && j['index-finger-metacarpal'], P = j && j['pinky-finger-metacarpal'], M = j && j['middle-finger-phalanx-proximal'];
+  if (!W || !I || !P || !M || !W.visible || !I.visible || !P.visible || !M.visible) { p.tracked = false; p.ready = false; return; }
+  const along = PV.a.subVectors(M.position, W.position).normalize();          // wrist to fingers
+  const across = PV.b.subVectors(I.position, P.position);                      // pinky to index
+  const normal = PV.c.crossVectors(across, along).normalize();                 // out of the palm (either side hits)
+  const side = PV.d.crossVectors(normal, along).normalize();
+  along.crossVectors(side, normal).normalize();
+  palmM.makeBasis(normal, along, side);
+  palmM.setPosition(PV.b.copy(W.position).lerp(M.position, 0.62));
+  p.palm.matrix.copy(palmM);
+  p.palm.updateMatrixWorld(true);
+  p.tracked = true;
+}
+
+const deskPaddle = makePaddle();
+deskPaddle.on = true;
+// handle points down, blade face points at the wall; the mouse version then tilts with your movement
+const deskBaseQ = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+  new THREE.Vector3(0, 0, -1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, -1, 0)));
+deskPaddle.group.quaternion.copy(deskBaseQ);
+scene.add(deskPaddle.group);
+const deskTilt = { yaw: 0, roll: 0, pitch: 0, lastX: 0, lastY: 0 };
+const deskQ = new THREE.Quaternion(), deskE = new THREE.Euler();
+
+const xrPaddles = [];
+const lasers = [];
+for (let i = 0; i < 2; i++) {
+  const ctrl = renderer.xr.getController(i);
+  const grip = renderer.xr.getControllerGrip(i);
+  scene.add(ctrl, grip);
+  const laser = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -4)]),
+    new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.6 })
+  );
+  laser.visible = false;
+  ctrl.add(laser);
+  lasers.push(laser);
+  const p = makePaddle();
+  p.grip = grip;
+  p.ctrl = ctrl;
+  p.group.visible = false;
+  grip.add(p.group);
+  p.handObj = renderer.xr.getHand(i);      // hand joints (filled in only while a hand is tracked)
+  scene.add(p.handObj);
+  const palm = makePalm();
+  p.palm = palm.palm;
+  p.palmHolder = palm.holder;
+  scene.add(p.palm);
+  ctrl.addEventListener('connected', (e) => {
+    p.source = e.data; p.on = true; p.ready = false;
+    p.hand = e.data.handedness || '';
+    p.isHand = !!e.data.hand;
+    p.holder = p.isHand ? p.palmHolder : p.batHolder;
+    p.r = p.isHand ? PALM_R : BR;
+    p.t = p.isHand ? PALM_T : BT;
+    p.tracked = !p.isHand;
+    p.group.visible = !p.isHand;
+    p.palm.visible = p.isHand;
+    p.aPrev = p.bPrev = false;
+  });
+  ctrl.addEventListener('disconnected', () => {
+    p.source = null; p.on = false; p.isHand = false; p.pressT = -1;
+    p.group.visible = false; p.palm.visible = false;
+  });
+  ctrl.addEventListener('selectstart', () => { p.pressT = performance.now(); onTrigger(p); });
+  ctrl.addEventListener('selectend', () => {
+    // bare hands have no A button: a quick pinch during a rally brings a new ball
+    if (game.state === 'shape' && !menu.open) { finishShape(p); p.pressT = -1; return; }
+    const quick = p.pressT > 0 && performance.now() - p.pressT < 400;
+    if (p.isHand && quick && !menu.open && (game.state === 'rally' || game.state === 'missed')) respawnBall();
+    p.pressT = -1;
+  });
+  ctrl.addEventListener('squeezestart', onGrip);
+  xrPaddles.push(p);
+}
+function activePaddles() {
+  return mode === 'desktop' ? [deskPaddle] : xrPaddles.filter((p) => p.on && p.tracked);
+}
+
+// ---------- sound (spatial in the headset) ----------
+let ac = null, noiseBuf = null, master = null;
+function initAudio() {
+  try {
+    if (!ac) {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      master = ac.createGain();
+      master.gain.value = 0.9;
+      master.connect(ac.destination);
+      noiseBuf = ac.createBuffer(1, Math.floor(ac.sampleRate * 0.2), ac.sampleRate);
+      const d = noiseBuf.getChannelData(0);
+      for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    }
+    if (ac.state !== 'running') ac.resume();
+  } catch (e) { ac = null; }
+}
+function outAt(pos) {
+  if (!pos || !ac.createPanner) return master;
+  try {
+    const p = ac.createPanner();
+    p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = 1; p.rolloffFactor = 0.7;
+    if (p.positionX) { p.positionX.value = pos.x; p.positionY.value = pos.y; p.positionZ.value = pos.z; }
+    else p.setPosition(pos.x, pos.y, pos.z);
+    p.connect(master);
+    return p;
+  } catch (e) { return master; }
+}
+function updateListener(cam) {
+  if (!ac) return;
+  const L = ac.listener;
+  const e = cam.matrixWorld.elements;
+  const px = e[12], py = e[13], pz = e[14];
+  const f = T.k.set(-e[8], -e[9], -e[10]).normalize();
+  try {
+    if (L.positionX) {
+      L.positionX.value = px; L.positionY.value = py; L.positionZ.value = pz;
+      L.forwardX.value = f.x; L.forwardY.value = f.y; L.forwardZ.value = f.z;
+      L.upX.value = e[4]; L.upY.value = e[5]; L.upZ.value = e[6];
+    } else {
+      L.setPosition(px, py, pz);
+      L.setOrientation(f.x, f.y, f.z, e[4], e[5], e[6]);
+    }
+  } catch (err) { /* listener not supported */ }
+}
+function knock(freq, dur, vol, noiseVol, bandFreq, pos) {
+  if (!ac || ac.state !== 'running') return;
+  const t = ac.currentTime, out = outAt(pos);
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.frequency.setValueAtTime(freq, t);
+  o.frequency.exponentialRampToValueAtTime(freq * 0.6, t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+  o.connect(g).connect(out);
+  o.start(t); o.stop(t + dur + 0.02);
+  const n = ac.createBufferSource(), f = ac.createBiquadFilter(), ng = ac.createGain();
+  n.buffer = noiseBuf; f.type = 'bandpass'; f.frequency.value = bandFreq; f.Q.value = 1.2;
+  ng.gain.setValueAtTime(noiseVol, t);
+  ng.gain.exponentialRampToValueAtTime(0.0008, t + dur * 0.6);
+  n.connect(f).connect(ng).connect(out);
+  n.start(t); n.stop(t + dur);
+}
+function tone(freq, dur, vol, when = 0) {
+  if (!ac || ac.state !== 'running') return;
+  const t = ac.currentTime + when;
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = 'sine'; o.frequency.value = freq;
+  g.gain.setValueAtTime(0.0008, t);
+  g.gain.exponentialRampToValueAtTime(vol, t + 0.015);
+  g.gain.exponentialRampToValueAtTime(0.0008, t + dur);
+  o.connect(g).connect(master);
+  o.start(t); o.stop(t + dur + 0.02);
+}
+const strength = (v) => THREE.MathUtils.clamp(v / 5, 0.25, 1);
+const sfx = {
+  paddle: (v, p) => knock(1150, 0.05, 0.22 * strength(v), 0.35 * strength(v), 2600, p),
+  wall: (v, p) => knock(230, 0.1, 0.3 * strength(v), 0.22 * strength(v), 900, p),
+  floor: (v, p) => knock(150, 0.08, 0.22 * strength(v), 0.14 * strength(v), 600, p),
+  target: () => { tone(784, 0.25, 0.18); tone(1175, 0.35, 0.16, 0.09); },
+  level: () => { tone(659, 0.18, 0.12); tone(988, 0.25, 0.12, 0.08); },
+  fault: () => { tone(392, 0.25, 0.14); tone(294, 0.4, 0.12, 0.14); },
+  end: () => { tone(523, 0.2, 0.14); tone(392, 0.2, 0.12, 0.16); tone(262, 0.5, 0.12, 0.32); },
+};
+function buzz(p, s, ms) {
+  const h = p && p.source && p.source.gamepad && p.source.gamepad.hapticActuators && p.source.gamepad.hapticActuators[0];
+  try { if (h && h.pulse) h.pulse(s, ms); } catch (e) { /* no haptics */ }
+}
+
+// ---------- game ----------
+let mode = 'desktop';
+const game = {
+  state: 'serve', score: 0, best: 0, balls: 3, hits: 0, returns: 0,
+  wallSinceHit: true, floorSinceHit: 0, msg: '', fault: false, timer: 0,
+  timeLeft: ATTACK_TIME, clockOn: false, noPlanes: false, demo: true, wallLocked: false, prevState: '',
+};
+let dirty = true;
+const servePt = new THREE.Vector3(0, 1.15, -0.3);
+const headPos = new THREE.Vector3(0, 1.5, 0.2);
+
+const bestKey = () => `hc-best-${settings.mode}-${settings.level}`;
+function loadBest() { game.best = parseInt(store.get(bestKey(), '0'), 10) || 0; }
+const multiplier = () => Math.min(4, 1 + Math.floor(game.returns / 4));
+
+function computeServePoint() {
+  if (mode === 'desktop') { servePt.set(0, 1.15, -0.3); return; }
+  const toward = front ? T.a.copy(front.n).negate() : T.a.set(0, 0, -1);
+  servePt.copy(headPos).addScaledVector(toward, 0.45);
+  servePt.y = Math.max(floorY + 0.6, headPos.y - 0.3);
+}
+function enterServe() {
+  game.state = 'serve';
+  game.wallSinceHit = true; game.floorSinceHit = 0; game.hits = 0; game.returns = 0; game.fault = false;
+  computeServePoint();
+  ballPos.copy(servePt);
+  prevPos.copy(servePt);
+  ballVel.set(0, 0, 0);
+  rolling = false;
+  dirty = true;
+}
+function newGame() {
+  game.score = 0; game.balls = 3; game.msg = '';
+  game.timeLeft = ATTACK_TIME; game.clockOn = false;
+  loadBest();
+  moveTarget();
+  enterServe();
+  for (const p of xrPaddles) p.pressT = -1;
+}
+function addScore(n) {
+  game.score += n;
+  if (!game.demo && game.score > game.best) { game.best = game.score; store.set(bestKey(), String(game.best)); }
+  dirty = true;
+}
+function lose(reason) {
+  if (game.state !== 'rally') return;
+  game.msg = reason;
+  game.fault = true;
+  game.returns = 0;
+  if (settings.mode === 'attack') {
+    game.state = 'missed';
+    game.timer = 1.1;
+  } else {
+    game.balls -= 1;
+    game.state = game.balls > 0 ? 'missed' : 'over';
+    game.timer = 1.8;
+    if (game.state === 'over') sfx.end();
+  }
+  if (game.state !== 'over') sfx.fault();
+  for (const p of activePaddles()) buzz(p, 0.8, 120);
+  dirty = true;
+}
+function endAttack() {
+  game.timeLeft = 0;
+  game.msg = 'Time';
+  game.fault = false;
+  game.state = 'over';
+  game.timer = 1.8;
+  sfx.end();
+  dirty = true;
+}
+
+function onPaddleHit(p, impact) {
+  sfx.paddle(impact + ballVel.length() * 0.5, ballPos);
+  buzz(p, THREE.MathUtils.clamp(0.3 + impact / 6, 0.3, 1), 40);
+  ripple(ballPos, T.j.copy(ballVel).normalize(), BALL, 0.05, 0.3);
+  if (game.state === 'serve') {
+    game.state = 'rally';
+    if (settings.mode === 'attack') game.clockOn = true;
+  }
+  if (game.state !== 'rally') return;
+  game.wallSinceHit = false;
+  game.floorSinceHit = 0;
+  game.hits += 1;
+  dirty = true;
+}
+
+function onBounce(kind, point, normal, speed) {
+  if (kind === 'floor') {
+    if (speed > 0.4) { sfx.floor(speed, point); ripple(point, normal, 0x222222, 0.05, 0.4); }
+    if (game.state !== 'rally') return;
+    game.floorSinceHit += 1;
+    if (!game.wallSinceHit) return lose('Hit the wall before the floor');
+    if (game.floorSinceHit > lvl().bounces) return lose(lvl().bounces > 1 ? 'Three bounces' : 'Two bounces');
+    return;
+  }
+  if (speed > 0.3) {
+    sfx.wall(speed, point);
+    ripple(point, normal, kind === 'front' ? courtColor.getHex() : 0xffffff, 0.07, 0.45);
+  }
+  if (kind !== 'front' || game.state !== 'rally' || game.wallSinceHit || !marks) return;
+  const local = marks.worldToLocal(T.i.copy(point));
+  if (local.y < TIN) return lose('Under the tin');
+  if (Math.abs(local.x) > marks.userData.hw + R || local.y > marks.userData.ztop + R) return lose('Out of the court');
+  game.wallSinceHit = true;
+  game.floorSinceHit = 0;
+  const mult = multiplier();
+  game.returns += 1;
+  addScore(mult);
+  const popPos = T.j.copy(point).addScaledVector(normal, 0.08);
+  popup(`+${mult}`, popPos);
+  if (multiplier() > mult) {
+    sfx.level();
+    popup(`×${multiplier()}`, T.j.copy(point).addScaledVector(normal, 0.08).addScaledVector(UP, 0.14), '#d4ee3c', true);
+  }
+  if (Math.hypot(local.x - target.position.x, local.y - target.position.y) < TARGET_R + R) {
+    const bonus = (settings.mode === 'attack' ? 5 : 3) * mult;
+    addScore(bonus);
+    sfx.target();
+    const c = marks.localToWorld(T.j.copy(target.position));
+    ripple(c, normal, courtColor.getHex(), 0.3, 0.7);
+    popup(`+${bonus}`, c.addScaledVector(normal, 0.1), '#ff7a5c', true);
+    for (const p of activePaddles()) buzz(p, 0.5, 80);
+    moveTarget();
+  }
+}
+
+// ---------- physics ----------
+// Help weak shots reach the wall. Casual also keeps them inside the court lines.
+function assist() {
+  const a = lvl().assist;
+  if (ballVel.length() > MAX_SPEED) ballVel.setLength(MAX_SPEED);   // cap first so the guidance below is not undone
+  if (a > 0 && front) {
+    const g = lvl().grav;
+    const toward = T.f.copy(front.n).negate();
+    const d = Math.max(0.2, T.g.copy(ballPos).sub(front.O).dot(front.n));
+    let along = ballVel.dot(toward);
+    const minAlong = a === 2 ? Math.max(2.0, d / 1.0) : Math.max(1.4, d / 1.3);
+    if (along < minAlong) { ballVel.addScaledVector(toward, minAlong - along); along = minAlong; }
+    const t = d / along;
+    const y0 = ballPos.y - floorY;
+    const fall = 0.5 * g * t * t;
+    const yAt = (vy) => y0 + vy * t - fall;
+    const lo = TIN + 0.3;
+    if (yAt(ballVel.y) < lo) ballVel.y = (lo - y0 + fall) / t;
+    if (a === 2 && marks) {
+      const hi = marks.userData.ztop - 0.15;
+      if (yAt(ballVel.y) > hi) ballVel.y = (hi - y0 + fall) / t;
+      const side = T.h.copy(ballPos).sub(front.O).dot(front.u);
+      const vu = ballVel.dot(front.u);
+      const xAt = side + vu * t, lim = front.hw - 0.12;
+      if (Math.abs(xAt) > lim) ballVel.addScaledVector(front.u, (Math.sign(xAt) * lim - side) / t - vu);
+    }
+  }
+}
+
+// Swept test between the ball and a bat's blade (a thin disc whose normal is the blade's local X).
+// prevWorld is where the ball was relative to the bat one step ago, expressed in today's bat frame.
+function collidePaddle(p, prevWorld, minSpeed = 0) {
+  if (p.cd > 0 || p.vel.length() < minSpeed) return false;
+  const ln = p.holder.worldToLocal(T.a.copy(ballPos));
+  if (Math.hypot(ln.y, ln.z) > p.r + R * 0.5) return false;
+  const lp = p.holder.worldToLocal(T.b.copy(prevWorld));
+  if (Math.abs(lp.x) > 0.6) return false;
+  const crossed = (ln.x >= 0) !== (lp.x >= 0);
+  if (!crossed && Math.abs(ln.x) > p.t + R) return false;
+  const side = lp.x >= 0 ? 1 : -1;
+  const n = T.c.set(1, 0, 0).transformDirection(p.holder.matrixWorld).multiplyScalar(side);
+  const vrel = T.d.copy(ballVel).sub(p.vel);
+  const vn = vrel.dot(n);
+  if (vn > 0) return false;                         // already moving away from this face
+  vrel.addScaledVector(n, -(1 + E_PAD) * vn);
+  ballVel.copy(vrel).add(p.vel);
+  // push the ball off the bat face, but never through a nearby wall or table
+  pushFrom.copy(ballPos);
+  ln.x = side * (p.t + R + 0.003);
+  ballPos.copy(p.holder.localToWorld(ln));
+  prevPos.copy(pushFrom);
+  for (const c of colliders) collideRect(c, true);
+  prevPos.copy(ballPos);
+  assist();
+  p.cd = 0.15;
+  onPaddleHit(p, -vn);
+  return true;
+}
+
+const pushFrom = new THREE.Vector3();
+// positionOnly: just move the ball back to the right side (used after a bat push), no bounce
+function collideRect(c, positionOnly = false) {
+  const lp = T.a.copy(ballPos).applyMatrix4(c.inv);
+  if (lp.x < c.minX - R || lp.x > c.maxX + R || lp.z < c.minZ - R || lp.z > c.maxZ + R) return;
+  const pp = T.b.copy(prevPos).applyMatrix4(c.inv);
+  const side = pp.y >= 0 ? 1 : -1;
+  if (side * lp.y >= R) return;
+  const n = T.c.copy(c.nW).multiplyScalar(side);
+  const vn = ballVel.dot(n);
+  lp.y = side * R;
+  ballPos.copy(lp.applyMatrix4(c.m));
+  if (positionOnly || vn >= 0) return;
+  if (c.up && side > 0 && -vn < 0.4) {
+    // settling on a table or sofa: stop the jitter and let it roll to a stop
+    ballVel.addScaledVector(n, -vn);
+    ballVel.multiplyScalar(0.97);
+    return;
+  }
+  ballVel.addScaledVector(n, -(1 + E_WALL) * vn);
+  // every front-wall contact counts for the rules, even a soft one
+  if (-vn > 0.3 || c.front) onBounce(c.front ? 'front' : 'other', T.e.copy(ballPos).addScaledVector(n, -R), n.clone(), -vn);
+}
+
+let rolling = false;
+function step(h) {
+  prevPos.copy(ballPos);
+  ballVel.y -= lvl().grav * h;
+  ballPos.addScaledVector(ballVel, h);
+  if (ballPos.y < floorY + R) {
+    ballPos.y = floorY + R;
+    if (ballVel.y < 0) {
+      const vn = -ballVel.y;
+      ballVel.x *= 0.94; ballVel.z *= 0.94;
+      if (vn > 0.4) {
+        ballVel.y = vn * E_FLOOR;
+        onBounce('floor', T.e.set(ballPos.x, floorY, ballPos.z), UP, vn);
+      } else {
+        ballVel.y = 0;
+        ballVel.x *= 0.97; ballVel.z *= 0.97;   // rolling friction
+        // a skidding ball still counts as touching the floor, once
+        if (!rolling) onBounce('floor', T.e.set(ballPos.x, floorY, ballPos.z), UP, vn);
+      }
+      rolling = vn <= 0.4;
+    }
+  } else if (ballPos.y > floorY + R + 0.01) {
+    rolling = false;
+  }
+  for (const c of colliders) collideRect(c);
+  for (const p of activePaddles()) collidePaddle(p, prevPos);
+}
+
+function checkRally() {
+  if (game.state !== 'rally') return;
+  const dx = ballPos.x - headPos.x, dz = ballPos.z - headPos.z;
+  if (Math.hypot(dx, dz) > 7 || ballPos.y < floorY - 0.5 || ballPos.y > floorY + 6) return lose('Out of reach');
+  if (ballVel.length() < 0.3 && ballPos.y < surfaceBelow(ballPos) + R + 0.02) lose('The ball stopped');
+}
+
+// highest up-facing surface under the ball (floor, table, sofa…)
+function surfaceBelow(pos) {
+  let best = floorY;
+  for (const c of colliders) {
+    if (!c.up || c.h <= best || c.h >= pos.y) continue;
+    const l = T.k.copy(pos).applyMatrix4(c.inv);
+    if (l.x >= c.minX && l.x <= c.maxX && l.z >= c.minZ && l.z <= c.maxZ) best = c.h;
+  }
+  return best;
+}
+
+// ---------- room scanning (mixed reality) ----------
+const planeMap = new Map();
+const planeLines = new THREE.Group();
+planeLines.visible = false;
+scene.add(planeLines);
+let frames = 0, arFrames = 0;
+
+function dropPlane(pl, rec) {
+  planeLines.remove(rec.outline);
+  rec.outline.geometry.dispose();
+  rec.outline.material.dispose();
+  planeMap.delete(pl);
+}
+function syncPlanes(frame, ref) {
+  const set = frame.detectedPlanes;
+  if (!set) return;
+  let changed = false;
+  for (const [pl, rec] of planeMap) {
+    if (!set.has(pl)) { dropPlane(pl, rec); changed = true; }
+  }
+  set.forEach((pl) => {
+    const old = planeMap.get(pl);
+    if (old && old.t === pl.lastChangedTime) return;
+    const pose = frame.getPose(pl.planeSpace, ref);
+    if (!pose || !pl.polygon || !pl.polygon.length) return;
+    const m = new THREE.Matrix4().fromArray(pose.transform.matrix);
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    const pts = [];
+    for (const p of pl.polygon) {
+      minX = Math.min(minX, p.x); maxX = Math.max(maxX, p.x);
+      minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
+      pts.push(new THREE.Vector3(p.x, 0, p.z));
+    }
+    const rect = finishRect({ m, minX, maxX, minZ, maxZ, plane: pl });
+    if (pl.orientation) rect.vertical = pl.orientation === 'vertical';
+    const label = pl.semanticLabel || '';
+    const isFloor = !rect.vertical && rect.nW.y > 0 && (label === 'floor' || rect.h < 0.25);
+    if (isFloor && Math.abs(rect.h) < 0.3 && Math.abs(rect.h - floorY) > 0.005) { floorY = rect.h; floorMoved = true; }
+    if (old) dropPlane(pl, old);
+    const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 }));
+    outline.matrixAutoUpdate = false;
+    outline.matrix.copy(m);
+    planeLines.add(outline);
+    planeMap.set(pl, { rect, outline, t: pl.lastChangedTime, isFloor, plane: pl });
+    changed = true;
+  });
+  if (changed) rebuildColliders();
+  // the floor was found or moved after the wall was chosen: put the court lines back on it
+  if (floorMoved) { floorMoved = false; if (front && game.state !== 'aim') refitFront(); }
+}
+let floorMoved = false;
+
+function rebuildColliders() {
+  if (mode !== 'ar') { colliders = virtualColliders.slice(); return; }
+  colliders = [];
+  let frontFound = false;
+  for (const rec of planeMap.values()) {
+    if (rec.isFloor) continue;
+    const isFront = !!(front && front.plane && front.plane === rec.plane);
+    rec.rect.front = isFront;
+    if (isFront) frontFound = true;
+    colliders.push(rec.rect);
+  }
+  if (front && !frontFound) colliders.push(front.rect);
+}
+
+let aimOverride = null;   // debug/tutorial only: a stand-in controller
+function aimSource() {
+  if (aimOverride) return aimOverride;
+  const right = xrPaddles.find((p) => p.on && p.hand === 'right') || xrPaddles.find((p) => p.on);
+  return right ? right.ctrl : renderer.xr.getCamera();
+}
+function aimCandidate() {
+  const src = aimSource();
+  const origin = new THREE.Vector3().setFromMatrixPosition(src.matrixWorld);
+  const dir = new THREE.Vector3(0, 0, -1).transformDirection(src.matrixWorld);
+  let best = null, bestT = 8;
+  for (const rec of planeMap.values()) {
+    const r = rec.rect;
+    if (!r.vertical || rec.isFloor) continue;
+    const lo = origin.clone().applyMatrix4(r.inv);
+    const ld = dir.clone().transformDirection(r.inv);
+    if (Math.abs(ld.y) < 1e-4) continue;
+    const t = -lo.y / ld.y;
+    if (t < 0.3 || t > bestT) continue;
+    const hx = lo.x + ld.x * t, hz = lo.z + ld.z * t;
+    if (hx < r.minX || hx > r.maxX || hz < r.minZ || hz > r.maxZ) continue;
+    best = rec; bestT = t;
+  }
+  if (best) return frontFromPlane(best, origin.clone().addScaledVector(dir, bestT), origin);
+  const d = dir.clone(); d.y = 0;
+  if (d.lengthSq() < 1e-4) d.set(0, 0, -1);
+  d.normalize();
+  const O = headPos.clone().addScaledVector(d, 2.4);
+  O.y = floorY;
+  return makeFront(O, d.negate(), court.fill ? 2.0 : court.w / 2, Math.max(2.4, court.h + 0.4), null);
+}
+function frontFromPlane(rec, hit, origin) {
+  const r = rec.rect;
+  const n = r.nW.clone(); n.y = 0;
+  if (n.lengthSq() < 1e-4) n.copy(origin).sub(hit).setY(0);
+  n.normalize();
+  if (n.dot(T.a.copy(origin).sub(hit)) < 0) n.negate();
+  const u = new THREE.Vector3().crossVectors(n.clone().negate(), UP).normalize();
+  let umin = Infinity, umax = -Infinity, ymax = -Infinity;
+  for (const [x, z] of [[r.minX, r.minZ], [r.minX, r.maxZ], [r.maxX, r.minZ], [r.maxX, r.maxZ]]) {
+    const w = new THREE.Vector3(x, 0, z).applyMatrix4(r.m);
+    const s = T.b.copy(w).sub(hit).dot(u);
+    umin = Math.min(umin, s); umax = Math.max(umax, s); ymax = Math.max(ymax, w.y);
+  }
+  let hw, off;
+  if (court.fill) {
+    // whole wall: edge to edge, centred on the wall
+    hw = Math.max(0.4, (umax - umin) / 2 - 0.04);
+    off = (umin + umax) / 2;
+  } else {
+    hw = Math.max(0.4, Math.min(court.w / 2, (umax - umin) / 2));
+    off = THREE.MathUtils.clamp(0, umin + hw, Math.max(umin + hw, umax - hw));
+  }
+  const O = hit.clone().addScaledVector(u, off);
+  O.y = floorY;
+  const f = makeFront(O, n, hw, Math.max(1.6, ymax - floorY), rec.plane);
+  f.rec = rec; f.hit = hit.clone(); f.origin = origin.clone();   // kept so the court can be resized later
+  f.wallMin = umin - off; f.wallMax = umax - off;
+  return f;
+}
+// resize or recolour the court that is already on the wall
+function refitFront() {
+  if (game.state === 'aim') return;          // the aiming preview already uses the new size
+  if (mode !== 'ar') front = makeVirtualFront();
+  else if (!front) return;
+  else if (front.plane && planeMap.has(front.plane)) front = frontFromPlane(planeMap.get(front.plane), front.hit, front.origin);
+  else front = makeFront(front.O, front.n, court.w / 2, Math.max(front.top, court.h + 0.4), null);
+  buildMarkings(front);
+  rebuildColliders();
+  if (game.state === 'serve') computeServePoint();
+}
+function applyColor() {
+  courtColor.setHex(COLORS[settings.color]);
+  for (const m of colorMats) m.color.copy(courtColor);
+  if (game.state !== 'aim' && front) buildMarkings(front);
+}
+function cycleColor() {
+  const keys = Object.keys(COLORS);
+  settings.color = keys[(keys.indexOf(settings.color) + 1) % keys.length];
+  store.set('hc-color', settings.color);
+  applyColor();
+  syncSettingsUI();
+}
+let courtDirty = false, courtSaveT = 0;
+// leaving "whole wall": start from the size the court has right now
+function unfill() {
+  if (!court.fill) return;
+  court.fill = false;
+  if (front) court.w = THREE.MathUtils.clamp(front.hw * 2, 1.0, 4.0);
+  if (marks) court.h = THREE.MathUtils.clamp(marks.userData.ztop, 1.2, 2.6);
+}
+function resizeCourt(ax, ay, dt) {
+  if (game.state === 'shape' || game.state === 'aim') return;
+  unfill();
+  if (Math.abs(ax) > 0.5) court.w = THREE.MathUtils.clamp(court.w + Math.sign(ax) * 1.2 * dt, 1.0, 4.0);
+  if (Math.abs(ay) > 0.5) court.h = THREE.MathUtils.clamp(court.h - Math.sign(ay) * 0.8 * dt, 1.2, 2.6);
+  settings.size = 'custom';
+  courtDirty = true;
+}
+// ---------- drawing the court on the wall: hold the trigger at one corner, drag to the other ----------
+const shape = { a: null, b: null, p: null, tooSmall: false };
+function enterShape() {
+  if (!front || game.state === 'aim' || game.state === 'shape') return;
+  game.prevState = game.state;
+  game.state = 'shape';
+  shape.a = shape.b = shape.p = null;
+  shape.tooSmall = false;
+  lasers.forEach((l) => { l.visible = true; });
+  dirty = true;
+}
+// where a controller's ray meets the front wall, in court units (x along the wall from O, y above the floor)
+function wallPoint(ctrl) {
+  const o = T.a.setFromMatrixPosition(ctrl.matrixWorld);
+  const d = T.b.set(0, 0, -1).transformDirection(ctrl.matrixWorld);
+  const denom = d.dot(front.n);
+  if (Math.abs(denom) < 1e-4) return null;
+  const t = T.c.copy(front.O).sub(o).dot(front.n) / denom;
+  if (t < 0.2 || t > 12) return null;
+  const hit = T.c.copy(o).addScaledVector(d, t);
+  return {
+    x: THREE.MathUtils.clamp(T.d.copy(hit).sub(front.O).dot(front.u), front.wallMin, front.wallMax),
+    y: THREE.MathUtils.clamp(hit.y - floorY, 0, front.top - 0.05),
+  };
+}
+function shapedFront(a, b) {
+  const x0 = Math.min(a.x, b.x), x1 = Math.max(a.x, b.x);
+  const hw = Math.max(0.3, (x1 - x0) / 2), cx = (x0 + x1) / 2;
+  const O = front.O.clone().addScaledVector(front.u, cx);
+  O.y = floorY;
+  const f = makeFront(O, front.n, hw, front.top, front.plane);
+  f.rec = front.rec; f.origin = front.origin;
+  f.hit = O.clone(); f.hit.y = floorY + 1.2;     // a later resize keeps the court where you drew it
+  f.wallMin = front.wallMin - cx; f.wallMax = front.wallMax - cx;
+  return f;
+}
+function withCourt(h, fn) {   // build markings for a preview height without changing the saved size
+  const saved = { h: court.h, fill: court.fill };
+  court.h = h; court.fill = false;
+  fn();
+  court.h = saved.h; court.fill = saved.fill;
+}
+function startShape(p) {
+  const h = wallPoint(p.ctrl);
+  if (!h) return;
+  shape.a = h; shape.b = { ...h }; shape.p = p; shape.tooSmall = false;
+  dirty = true;
+}
+function updateShape() {
+  if (!shape.p) return;
+  const h = wallPoint(shape.p.ctrl);
+  if (h) shape.b = h;
+  if (frames % 3 === 0 && Math.abs(shape.b.x - shape.a.x) > 0.3) {
+    withCourt(Math.max(shape.a.y, shape.b.y), () => buildMarkings(shapedFront(shape.a, shape.b)));
+  }
+}
+function finishShape(p) {
+  if (shape.p !== p) return;
+  const { a, b } = shape;
+  shape.p = null;
+  const top = Math.max(a.y, b.y);
+  if (Math.abs(b.x - a.x) < 0.6 || top < TIN + 0.9) {
+    shape.tooSmall = true;          // stay in drawing mode; show the old court again
+    buildMarkings(front);
+    dirty = true;
+    return;
+  }
+  front = shapedFront(a, b);
+  court.fill = false;
+  court.w = front.hw * 2;
+  court.h = top;
+  settings.size = 'custom';
+  store.set('hc-size', 'custom'); store.set('hc-w', court.w.toFixed(2)); store.set('hc-h', court.h.toFixed(2));
+  buildMarkings(front);
+  rebuildColliders();
+  exitShape();
+}
+function exitShape() {
+  lasers.forEach((l) => { l.visible = menu.open; });
+  if (game.prevState === 'over') { game.state = 'over'; dirty = true; } else enterServe();
+  syncSettingsUI();
+}
+function respawnBall() {
+  if (game.state === 'aim' || game.state === 'shape') return;
+  if (game.state === 'over') { newGame(); return; }
+  enterServe();
+  tone(880, 0.12, 0.1);
+}
+let aimFront = null;
+function lockWall(f) {
+  front = f || aimFront || aimCandidate();
+  buildMarkings(front);
+  planeLines.visible = false;
+  lasers.forEach((l) => { l.visible = menu.open; });
+  rebuildColliders();
+  // the first wall starts a game; choosing another wall mid-game keeps the score, balls and clock
+  if (!game.wallLocked || game.prevState === 'over') newGame(); else enterServe();
+  game.wallLocked = true;
+  for (const p of xrPaddles) p.pressT = -1;   // a held pinch must not open the menu straight after
+}
+function enterAim() {
+  game.prevState = game.state;
+  game.state = 'aim';
+  planeLines.visible = true;
+  lasers.forEach((l) => { l.visible = true; });
+  aimFront = null;
+  dirty = true;
+}
+
+// ---------- settings changes (from the page or the in-headset menu) ----------
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
+function setSetting(name, value) {
+  settings[name] = value;
+  store.set(`hc-${name}`, value);
+  syncSettingsUI();
+  if (game.state === 'aim') { loadBest(); dirty = true; } else newGame();
+}
+function setTint(on) {
+  settings.tint = on;
+  store.set('hc-tint', on ? '1' : '0');
+  if (front && game.state !== 'aim') buildMarkings(front);
+  syncSettingsUI();
+}
+function setSize(key) {
+  settings.size = key;
+  store.set('hc-size', key);
+  court.fill = key === 'wall';
+  court.w = SIZES[key].w; court.h = SIZES[key].h;
+  store.set('hc-w', String(court.w)); store.set('hc-h', String(court.h));
+  refitFront();
+  syncSettingsUI();
+}
+
+// ---------- in-headset menu (B or Y button; pinch and hold with bare hands) ----------
+const MENU_PX_W = 1024, MENU_HEAD = 132, MENU_ROW = 92, MENU_MAX_ROWS = 12;
+const MENU_PX_H = MENU_HEAD + MENU_ROW * MENU_MAX_ROWS + 36;
+const menuCanvas = document.createElement('canvas');
+menuCanvas.width = MENU_PX_W; menuCanvas.height = MENU_PX_H;
+const mctx = menuCanvas.getContext('2d');
+const menuTex = new THREE.CanvasTexture(menuCanvas);
+menuTex.colorSpace = THREE.SRGBColorSpace;
+menuTex.anisotropy = 4;
+const MENU_W = 0.72;
+const menuMesh = new THREE.Mesh(
+  new THREE.PlaneGeometry(MENU_W, MENU_W * MENU_PX_H / MENU_PX_W),
+  new THREE.MeshBasicMaterial({ map: menuTex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false })
+);
+menuMesh.renderOrder = 10;
+menuMesh.visible = false;
+scene.add(menuMesh);
+const menu = { open: false, hover: -1, side: 0, rows: [] };
+const menuRay = new THREE.Raycaster();
+const LEVEL_ORDER = ['casual', 'club', 'pro'];
+
+function menuRows() {
+  const rows = [
+    { label: 'Resume', act: () => closeMenu() },
+    { label: 'New ball', act: () => { closeMenu(); respawnBall(); } },
+  ];
+  if (mode === 'ar') rows.push({ label: 'Choose a different wall', act: () => { closeMenu(); enterAim(); } });
+  rows.push(
+    { label: 'Fill the whole wall', value: () => (court.fill ? 'On' : 'Off'), act: () => setSize(court.fill ? 'medium' : 'wall') },
+    { label: 'Draw the court', value: () => 'Drag corners', act: () => { closeMenu(); enterShape(); } },
+    { label: 'Court width', value: () => `${(court.fill && front ? front.hw * 2 : court.w).toFixed(1)} m`, step: (d) => { unfill(); court.w = THREE.MathUtils.clamp(court.w + d * 0.2, 1.0, 4.0); settings.size = 'custom'; courtDirty = true; } },
+    { label: 'Court height', value: () => `${(court.fill && marks ? marks.userData.ztop : court.h).toFixed(1)} m`, step: (d) => { unfill(); court.h = THREE.MathUtils.clamp(court.h + d * 0.1, 1.2, 2.6); settings.size = 'custom'; courtDirty = true; } },
+    { label: 'Colour', value: () => cap(settings.color), swatch: true, act: () => cycleColor() },
+    { label: 'Paint the court', value: () => (settings.tint ? 'On' : 'Off'), act: () => setTint(!settings.tint) },
+    { label: 'Mode', value: () => MODES[settings.mode].label, act: () => setSetting('mode', settings.mode === 'rally' ? 'attack' : 'rally') },
+    { label: 'Level', value: () => cap(settings.level), act: () => setSetting('level', LEVEL_ORDER[(LEVEL_ORDER.indexOf(settings.level) + 1) % 3]) },
+    { label: 'Leave the game', act: () => { const s = renderer.xr.getSession(); if (s) s.end(); } },
+  );
+  return rows.slice(0, MENU_MAX_ROWS);
+}
+function drawMenu() {
+  const c = mctx, W = MENU_PX_W;
+  c.clearRect(0, 0, W, MENU_PX_H);
+  const h = MENU_HEAD + menu.rows.length * MENU_ROW + 36;
+  roundRect(c, 4, 4, W - 8, h - 8, 40);
+  c.fillStyle = 'rgba(16,18,21,0.98)'; c.fill();
+  c.strokeStyle = 'rgba(255,255,255,0.16)'; c.lineWidth = 3; c.stroke();
+  c.fillStyle = '#ffffff';
+  c.font = "800 56px Archivo, 'Arial Narrow', sans-serif";
+  c.fillText('Paused', 56, 92);
+  c.fillStyle = '#9aa1aa';
+  c.font = "500 26px Inter, sans-serif";
+  c.textAlign = 'right';
+  c.fillText('Point and pull the trigger', W - 56, 88);
+  c.textAlign = 'left';
+  menu.rows.forEach((row, i) => {
+    const y = MENU_HEAD + i * MENU_ROW;
+    const hot = menu.hover === i;
+    if (hot) { roundRect(c, 28, y + 6, W - 56, MENU_ROW - 12, 20); c.fillStyle = 'rgba(255,255,255,0.10)'; c.fill(); }
+    c.fillStyle = row.label === 'Leave the game' ? '#ff8a70' : '#ffffff';
+    c.font = "600 38px Inter, sans-serif";
+    c.fillText(row.label, 56, y + 60);
+    if (row.step) {
+      const minusHot = hot && menu.side < 0, plusHot = hot && menu.side > 0;
+      c.fillStyle = minusHot ? '#d4ee3c' : 'rgba(255,255,255,0.75)';
+      c.font = "700 46px Inter, sans-serif";
+      c.textAlign = 'center';
+      c.fillText('−', 660, y + 62);
+      c.fillStyle = plusHot ? '#d4ee3c' : 'rgba(255,255,255,0.75)';
+      c.fillText('+', 930, y + 62);
+      c.fillStyle = '#ffffff';
+      c.font = "600 36px Inter, sans-serif";
+      c.fillText(row.value(), 795, y + 60);
+      c.textAlign = 'left';
+    } else if (row.value) {
+      c.fillStyle = '#d5d9de';
+      c.font = "500 36px Inter, sans-serif";
+      c.textAlign = 'right';
+      c.fillText(row.value(), W - 56, y + 60);
+      if (row.swatch) {
+        const tw = c.measureText(row.value()).width;
+        c.beginPath(); c.arc(W - 56 - tw - 30, y + 48, 16, 0, Math.PI * 2);
+        c.fillStyle = `#${courtColor.getHexString()}`; c.fill();
+      }
+      c.textAlign = 'left';
+    }
+  });
+  menuTex.needsUpdate = true;
+}
+function menuHit(ctrl) {
+  menuRay.ray.origin.setFromMatrixPosition(ctrl.matrixWorld);
+  menuRay.ray.direction.set(0, 0, -1).transformDirection(ctrl.matrixWorld);
+  const hit = menuRay.intersectObject(menuMesh, false)[0];
+  if (!hit || !hit.uv) return null;
+  const px = hit.uv.x * MENU_PX_W, py = (1 - hit.uv.y) * MENU_PX_H;
+  const row = Math.floor((py - MENU_HEAD) / MENU_ROW);
+  if (row < 0 || row >= menu.rows.length) return null;
+  return { row, side: px < 795 ? -1 : 1 };
+}
+function updateMenuHover() {
+  let h = null;
+  for (const p of xrPaddles) { if (p.on && (h = menuHit(p.ctrl))) break; }
+  const row = h ? h.row : -1, side = h ? h.side : 0;
+  if (row !== menu.hover || side !== menu.side) { menu.hover = row; menu.side = side; drawMenu(); }
+}
+function menuClick(p) {
+  const h = menuHit(p.ctrl);
+  if (!h) return;
+  const row = menu.rows[h.row];
+  tone(1046, 0.06, 0.08);
+  if (row.step) row.step(h.side); else if (row.act) row.act();
+  if (menu.open) { menu.rows = menuRows(); drawMenu(); }
+}
+function openMenu() {
+  if (!renderer.xr.isPresenting || menu.open) return;
+  menu.open = true;
+  menu.rows = menuRows();
+  menu.hover = -1;
+  const cam = renderer.xr.getCamera();
+  cam.getWorldPosition(headPos);
+  const d = T.a.set(0, 0, -1).transformDirection(cam.matrixWorld);
+  d.y = 0;
+  if (d.lengthSq() < 1e-4) d.set(0, 0, -1);
+  d.normalize();
+  menuMesh.position.copy(headPos).addScaledVector(d, 0.75);
+  menuMesh.position.y = headPos.y - 0.12;
+  menuMesh.lookAt(headPos.x, menuMesh.position.y, headPos.z);
+  menuMesh.visible = true;
+  lasers.forEach((l) => { l.visible = true; });
+  drawMenu();
+  dirty = true;
+}
+function closeMenu() {
+  if (!menu.open) return;
+  menu.open = false;
+  menuMesh.visible = false;
+  lasers.forEach((l) => { l.visible = game.state === 'aim'; });
+  for (const p of xrPaddles) p.ready = false;   // no velocity spike from the pause
+  dirty = true;
+}
+function toggleMenu() { initAudio(); if (menu.open) closeMenu(); else openMenu(); }
+
+// ---------- input ----------
+function onTrigger(p) {
+  initAudio();
+  if (menu.open) { if (p) menuClick(p); return; }
+  if (game.state === 'shape') { if (p) startShape(p); return; }
+  if (game.state === 'aim') { lockWall(); return; }
+  if (game.state === 'over') { newGame(); return; }
+  if (game.state === 'serve') enterServe();   // bring the ball back in front of you
+}
+function onGrip() {
+  initAudio();
+  if (menu.open) return;
+  if (mode === 'ar' && game.state !== 'aim') enterAim();
+  else if (game.state === 'serve') enterServe();
+}
+
+const mouse = new THREE.Vector2(0.05, -0.2);
+const raycaster = new THREE.Raycaster();
+const deskPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), -0.05);
+let swingT = -1;
+const SWING = 0.28;
+function setMouse(e) {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+}
+function takeOver() {
+  if (!game.demo) return;
+  game.demo = false;
+  deskPlane.constant = -0.05;   // back to the normal hitting spot
+  demoChip.hidden = true;
+  document.getElementById('caption').textContent = 'Your turn. Aim with the mouse, click or press Space to swing. In the headset you see your own room instead of this one.';
+  newGame();
+}
+function swing() {
+  initAudio();
+  if (game.state === 'over') { newGame(); return; }
+  if (swingT < 0) swingT = 0;
+}
+renderer.domElement.addEventListener('pointermove', (e) => {
+  if (!e.isTrusted) return;
+  // the browser also fires moves when the page scrolls under a resting mouse; only real movement takes over
+  if (game.demo && Math.abs(e.movementX || 0) + Math.abs(e.movementY || 0) < 2) return;
+  takeOver();
+  setMouse(e);
+});
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  if (!e.isTrusted) return;
+  takeOver();
+  setMouse(e);
+  swing();
+});
+renderer.domElement.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); takeOver(); swing(); }
+  if (e.code === 'KeyR') { takeOver(); respawnBall(); }
+});
+function moveDeskPaddle(dt) {
+  raycaster.setFromCamera(mouse, camera);
+  if (!raycaster.ray.intersectPlane(deskPlane, T.a)) return;
+  T.a.x = THREE.MathUtils.clamp(T.a.x, -1.4, 1.4);
+  T.a.y = THREE.MathUtils.clamp(T.a.y, 0.35, 2.1);
+  // tilt like a real wrist: face angles back toward the middle of the court and leans into sideways moves
+  if (dt > 0) {
+    const vx = (T.a.x - deskTilt.lastX) / dt, vy = (T.a.y - deskTilt.lastY) / dt;
+    const k = Math.min(1, dt * 10);
+    deskTilt.yaw += (THREE.MathUtils.clamp(T.a.x * 0.22, -0.35, 0.35) - deskTilt.yaw) * k;          // + turns the face toward the middle
+    deskTilt.roll += (THREE.MathUtils.clamp(-vx * 0.09, -0.45, 0.45) - deskTilt.roll) * k;         // lean (looks only)
+    deskTilt.pitch += (THREE.MathUtils.clamp(vy * 0.05 + (swingT >= 0 ? 0.15 : 0), -0.4, 0.4) - deskTilt.pitch) * k;   // + opens the face upward
+  }
+  deskTilt.lastX = T.a.x; deskTilt.lastY = T.a.y;
+  deskE.set(deskTilt.pitch, deskTilt.yaw, deskTilt.roll, 'YXZ');
+  deskPaddle.group.quaternion.copy(deskQ.setFromEuler(deskE).multiply(deskBaseQ));
+  if (swingT >= 0) {
+    swingT += dt;
+    T.a.z -= 0.5 * Math.sin(Math.PI * Math.min(swingT / SWING, 1));
+    if (swingT >= SWING) swingT = -1;
+  }
+  deskPaddle.group.updateMatrixWorld(true);
+  deskPaddle.holder.getWorldPosition(T.b);
+  deskPaddle.group.position.add(T.a.sub(T.b));
+}
+
+// demo player for the page preview
+// the demo player steps forward to meet the ball, like a real player would
+let demoT = 0, demoZ = 0.05;
+function demoBot(dt) {
+  let wantZ = 0.05;
+  if (game.state === 'rally' && game.wallSinceHit && ballVel.z > 0) wantZ = THREE.MathUtils.clamp(ballPos.z + 0.5, -1.5, 0.05);
+  demoZ += (wantZ - demoZ) * Math.min(1, dt * 5);
+  deskPlane.constant = -demoZ;
+  const aim = T.h.copy(ballPos);
+  aim.y = Math.max(aim.y, floorY + 0.3);
+  aim.z = demoZ;
+  aim.project(camera);
+  const k = Math.min(1, dt * 10);
+  mouse.x += (aim.x - mouse.x) * k;
+  mouse.y += (aim.y - mouse.y) * k;
+  if (swingT >= 0) return;
+  if (game.state === 'serve') { demoT += dt; if (demoT > 1.3) { demoT = 0; swingT = 0; } }
+  else if (game.state === 'rally' && game.wallSinceHit && ballVel.z > 0 && ballPos.z > demoZ - 0.42 && ballPos.z < demoZ - 0.12 && ballPos.y < 2.0) swingT = 0;
+  else if (game.state === 'over') { demoT += dt; if (demoT > 2.5) { demoT = 0; newGame(); } }
+}
+
+// ---------- score board ----------
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+let headsetText = false;   // debug/tutorial: show the headset wording on the preview
+function message() {
+  const xr = mode !== 'desktop' || headsetText;
+  if (game.demo && !xr && showDemoText) return 'Demo. Move the mouse here to play';
+  switch (game.state) {
+    case 'aim': return game.noPlanes ? 'No room scan found. Pull the trigger to place a wall' : 'Point at a wall and pull the trigger';
+    case 'shape':
+      if (shape.p) return 'Drag to the opposite corner, then let go';
+      return shape.tooSmall ? 'Too small. Draw a bigger court' : 'Point at one corner of your court and hold the trigger';
+    case 'serve': {
+      if (!xr) return 'Click to swing at the ball';
+      const hands = xrPaddles.some((p) => p.on && p.isHand);
+      return hands ? 'Hit the ball with your palm. Pinch and hold: menu' : 'Swing through the ball. B or Y: menu';
+    }
+    case 'rally': return game.returns >= 2 ? `Rally of ${game.returns}` : '';
+    case 'missed': return game.msg;
+    case 'over': return `${game.msg}. ${xr ? 'Pull the trigger' : 'Click'} to play again`;
+    default: return '';
+  }
+}
+let shownSecond = -1;
+function drawHud() {
+  const c = hctx, W = hudCanvas.width, H = hudCanvas.height;
+  c.clearRect(0, 0, W, H);
+  roundRect(c, 4, 4, W - 8, H - 8, 40);
+  c.fillStyle = 'rgba(16,18,21,0.84)'; c.fill();
+  c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 3; c.stroke();
+
+  const label = (t, x) => { c.fillStyle = '#9aa1aa'; c.font = "600 26px Inter, sans-serif"; c.fillText(t.split('').join(String.fromCharCode(8202)), x, 70); };
+  const attack = settings.mode === 'attack';
+  label('SCORE', 56); label('BEST', 430); label(attack ? 'TIME' : 'BALLS', 690);
+
+  c.fillStyle = '#ffffff';
+  c.font = "800 128px Archivo, 'Arial Narrow', sans-serif";
+  const scoreText = String(game.score);
+  c.fillText(scoreText, 50, 196);
+  const mult = multiplier();
+  if (mult > 1 && (game.state === 'rally' || game.state === 'serve')) {
+    const x = 50 + c.measureText(scoreText).width + 18;
+    roundRect(c, x, 112, 86, 54, 27);
+    c.fillStyle = '#d4ee3c'; c.fill();
+    c.fillStyle = '#111316';
+    c.font = "800 38px Archivo, 'Arial Narrow', sans-serif";
+    c.fillText(`×${mult}`, x + 16, 152);
+  }
+  c.fillStyle = '#d5d9de';
+  c.font = "700 72px Archivo, 'Arial Narrow', sans-serif";
+  c.fillText(String(game.best), 428, 178);
+  if (attack) {
+    const s = Math.ceil(game.timeLeft);
+    c.fillStyle = s <= 10 && game.clockOn ? '#ff7a5c' : '#ffffff';
+    c.fillText(`${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`, 688, 178);
+  } else {
+    for (let i = 0; i < 3; i++) {
+      c.beginPath();
+      c.arc(712 + i * 70, 150, 22, 0, Math.PI * 2);
+      if (i < game.balls) { c.fillStyle = '#d4ee3c'; c.fill(); }
+      else { c.strokeStyle = 'rgba(255,255,255,0.3)'; c.lineWidth = 4; c.stroke(); }
+    }
+  }
+  c.fillStyle = 'rgba(255,255,255,0.1)'; c.fillRect(56, 232, W - 112, 2);
+  c.fillStyle = game.fault && (game.state === 'missed' || game.state === 'over') ? '#ff7a5c' : '#ffffff';
+  c.font = "500 40px Inter, sans-serif";
+  c.fillText(message(), 56, 300, W - 330);
+  c.fillStyle = '#9aa1aa';
+  c.font = "500 26px Inter, sans-serif";
+  c.textAlign = 'right';
+  c.fillText(`${MODES[settings.mode].label} · ${settings.level[0].toUpperCase()}${settings.level.slice(1)}`, W - 56, 298);
+  c.textAlign = 'left';
+  hudTex.needsUpdate = true;
+  dirty = false;
+}
+
+// ---------- modes ----------
+function setMode(m) {
+  mode = m;
+  room.visible = m !== 'ar';
+  scene.background = m === 'ar' ? null : new THREE.Color(0xd9dbde);
+  deskPaddle.group.visible = m === 'desktop';
+  if (m !== 'ar') {
+    floorY = 0;
+    front = makeVirtualFront();
+    planeLines.visible = false;
+    lasers.forEach((l) => { l.visible = false; });
+    buildMarkings(front);
+  } else if (marks) {
+    marks.visible = false;   // hidden until a wall is chosen
+  }
+  rebuildColliders();
+  dirty = true;
+}
+
+// ---------- main loop ----------
+const clock = new THREE.Clock();
+let wasHidden = false;
+function frame(time, xrFrame, forcedDt) {
+  const dt = forcedDt !== undefined ? forcedDt : Math.min(clock.getDelta(), 0.05);
+  const xr = renderer.xr.isPresenting;
+  const session = renderer.xr.getSession();
+  frames++;
+
+  // the Quest's own menu is open: freeze the game, then show our menu when the player comes back
+  const vis = session && session.visibilityState ? session.visibilityState : 'visible';
+  if (vis !== 'visible') {
+    wasHidden = true;
+    for (const p of xrPaddles) p.ready = false;   // no bat-speed spike when play resumes
+    renderer.render(scene, camera);
+    return;
+  }
+  if (wasHidden) {
+    wasHidden = false;
+    if (game.state !== 'aim' && !menu.open) openMenu();
+  }
+
+  if (!xr) {
+    if (game.demo) demoBot(dt);
+    moveDeskPaddle(dt);
+  }
+  scene.updateMatrixWorld(true);
+
+  if (xr) {
+    const cam = renderer.xr.getCamera();
+    cam.getWorldPosition(headPos);
+    updateListener(cam);
+    const ref = renderer.xr.getReferenceSpace();
+    if (mode === 'ar' && xrFrame) {
+      arFrames++;
+      if (arFrames % 15 === 1) syncPlanes(xrFrame, ref);
+      let anyWall = false;
+      for (const r of planeMap.values()) if (r.rect.vertical) { anyWall = true; break; }
+      const none = !anyWall && arFrames > 120;
+      if (game.noPlanes !== none) { game.noPlanes = none; dirty = true; }
+    }
+    for (const p of xrPaddles) {
+      p.poseVel = false;
+      if (!p.on || !p.source) continue;
+      if (p.isHand) {
+        updatePalm(p);
+        // pinch and hold: open or close the menu
+        if (p.pressT > 0 && game.state !== 'shape' && performance.now() - p.pressT > 1000) { p.pressT = -1; toggleMenu(); }
+        continue;
+      }
+      const gp = p.source.gamepad;
+      if (gp) {
+        const btn = (k) => !!(gp.buttons[k] && gp.buttons[k].pressed);
+        const a = btn(4), b = btn(5);                       // A/X and B/Y
+        if (a && !p.aPrev && !menu.open) respawnBall();
+        if (b && !p.bPrev) toggleMenu();
+        p.aPrev = a; p.bPrev = b;
+        const ax = gp.axes[2] || 0, ay = gp.axes[3] || 0;   // thumbstick
+        if (!menu.open && game.state !== 'over' && (Math.abs(ax) > 0.5 || Math.abs(ay) > 0.5)) resizeCourt(ax, ay, dt);
+      }
+      if (!p.source.gripSpace || !xrFrame || !ref) continue;
+      const pose = xrFrame.getPose(p.source.gripSpace, ref);
+      if (pose && pose.linearVelocity) {
+        const lv = pose.linearVelocity;
+        p.vel.set(lv.x, lv.y, lv.z);
+        if (pose.angularVelocity) {
+          const av = pose.angularVelocity;
+          p.holder.getWorldPosition(T.e);
+          T.f.setFromMatrixPosition(p.grip.matrixWorld);
+          p.vel.add(T.g.set(av.x, av.y, av.z).cross(T.e.sub(T.f)));
+        }
+        p.poseVel = true;
+      }
+    }
+    if (menu.open) updateMenuHover();
+    if (courtDirty && performance.now() - courtSaveT > 100) {
+      courtDirty = false;
+      courtSaveT = performance.now();
+      store.set('hc-w', court.w.toFixed(2)); store.set('hc-h', court.h.toFixed(2)); store.set('hc-size', 'custom');
+      refitFront();
+      if (menu.open) drawMenu();
+    }
+  } else {
+    headPos.set(0, 1.5, 0.2);
+    updateListener(camera);
+  }
+
+  for (const p of activePaddles()) {
+    p.cd = Math.max(0, p.cd - dt);
+    p.holder.getWorldPosition(T.e);
+    if (!p.poseVel) {
+      if (p.ready && dt > 0) {
+        T.f.copy(T.e).sub(p.prev).divideScalar(dt);
+        if (T.f.length() > 10) T.f.setLength(10);
+        p.vel.lerp(T.f, 0.6);
+      } else { p.vel.set(0, 0, 0); }
+    }
+    p.ready = true;
+    p.prev.copy(T.e);
+  }
+
+  if (menu.open) {
+    // paused while the menu is open
+  } else if (game.state === 'aim') {
+    if (frames % 6 === 0) { aimFront = aimCandidate(); buildMarkings(aimFront); }
+  } else if (game.state === 'shape') {
+    updateShape();
+  } else if (game.state === 'serve') {
+    ballPos.copy(servePt);
+    ballPos.y += Math.sin(time / 420) * 0.012;
+    prevPos.copy(ballPos);
+    for (const p of activePaddles()) collidePaddle(p, T.h.copy(ballPos).addScaledVector(p.vel, dt), SERVE_MIN_SPEED);
+  } else {
+    for (const p of activePaddles()) collidePaddle(p, T.h.copy(ballPos).addScaledVector(p.vel, dt));
+    const steps = THREE.MathUtils.clamp(Math.ceil((ballVel.length() * dt) / 0.015), 1, 12);
+    for (let i = 0; i < steps; i++) step(dt / steps);
+    checkRally();
+    if (game.state === 'missed') {
+      game.timer -= dt;
+      if (game.timer <= 0) enterServe();
+    }
+  }
+
+  if (settings.mode === 'attack' && game.clockOn && !menu.open && game.state !== 'over' && game.state !== 'aim' && game.state !== 'shape') {
+    game.timeLeft -= dt;
+    if (game.timeLeft <= 0) endAttack();
+    const s = Math.ceil(game.timeLeft);
+    if (s !== shownSecond) { shownSecond = s; dirty = true; }
+  }
+
+  // ball, its shadow and its landing spot
+  const showBall = game.state !== 'aim' && game.state !== 'shape';
+  ball.visible = showBall;
+  ball.position.copy(ballPos);
+  const hv = Math.hypot(ballVel.x, ballVel.z);
+  if (hv > 0.05) ball.rotateOnWorldAxis(T.i.set(ballVel.z, 0, -ballVel.x).normalize(), (hv / R) * dt * 0.5);
+  const below = surfaceBelow(ballPos);
+  const hgt = Math.max(0, ballPos.y - below);
+  shadow.visible = showBall;
+  shadow.position.set(ballPos.x, below + 0.003, ballPos.z);
+  shadow.scale.setScalar(1 + hgt * 0.8);
+  shadow.material.opacity = THREE.MathUtils.clamp(1 - hgt / 2.2, 0.12, 0.9);
+
+  marker.visible = false;
+  if (game.state === 'rally' && game.wallSinceHit) {
+    const g = lvl().grav, h0 = ballPos.y - floorY - R;
+    const tl = (ballVel.y + Math.sqrt(Math.max(0, ballVel.y * ballVel.y + 2 * g * h0))) / g;
+    if (tl > 0.12 && tl < 2.5) {
+      marker.visible = true;
+      marker.position.set(ballPos.x + ballVel.x * tl, floorY + 0.004, ballPos.z + ballVel.z * tl);
+      marker.material.opacity = THREE.MathUtils.clamp(0.9 - tl * 0.3, 0.25, 0.8);
+    }
+  }
+
+  target.scale.setScalar(1 + Math.sin(time / 300) * 0.025);
+  updateRipples(dt);
+  updatePopups(dt);
+  if (dirty) drawHud();
+  renderer.render(scene, camera);
+}
+
+// ---------- sizing ----------
+let showDemoText = true, viewLocked = false;
+function resize() {
+  if (renderer.xr.isPresenting || viewLocked) return;
+  const r = stage.getBoundingClientRect();
+  if (!r.width || !r.height) return;
+  renderer.setSize(r.width, r.height, false);
+  camera.aspect = r.width / r.height;
+  camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+
+// ---------- starting the headset ----------
+let starting = false;
+async function startXR(type) {
+  if (starting || renderer.xr.isPresenting) return;
+  starting = true;
+  initAudio();
+  try {
+    const opts = type === 'immersive-ar'
+      ? { requiredFeatures: ['local-floor'], optionalFeatures: ['plane-detection', 'hand-tracking'] }
+      : { requiredFeatures: ['local-floor'], optionalFeatures: ['hand-tracking'] };
+    const session = await navigator.xr.requestSession(type, opts);
+    session.addEventListener('end', () => {
+      menu.open = false;
+      menuMesh.visible = false;
+      wasHidden = false;
+      for (const [pl, rec] of [...planeMap]) dropPlane(pl, rec);
+      game.demo = false;
+      demoChip.hidden = true;
+      setMode('desktop');
+      newGame();
+      setTimeout(resize, 0);   // three.js finishes leaving the headset after this handler
+    });
+    await renderer.xr.setSession(session);
+    game.demo = false;
+    demoChip.hidden = true;
+    arFrames = 0;
+    // the player recentred the view: the room scan moved, so re-read it and choose the wall again
+    const ref = renderer.xr.getReferenceSpace();
+    if (ref && ref.addEventListener) {
+      ref.addEventListener('reset', () => {
+        for (const [pl, rec] of [...planeMap]) dropPlane(pl, rec);
+        arFrames = 0;
+        if (mode === 'ar' && game.state !== 'aim') { closeMenu(); enterAim(); }
+        else if (mode === 'vr' && game.state === 'serve') enterServe();
+      });
+    }
+    if (type === 'immersive-ar') {
+      setMode('ar');
+      front = null;
+      rebuildColliders();
+      game.score = 0;
+      game.wallLocked = false;
+      enterAim();
+    } else {
+      setMode('vr');
+      newGame();
+      setTimeout(() => { if (game.state === 'serve') enterServe(); }, 400);  // re-centre once the head pose is known
+    }
+  } catch (e) {
+    setStatus(`The headset view could not start: ${e.message || e}`);
+  } finally {
+    starting = false;
+  }
+}
+btnAR.addEventListener('click', () => startXR('immersive-ar'));
+btnVR.addEventListener('click', () => startXR('immersive-vr'));
+
+function setStatus(text, ok = false) {
+  statusEl.textContent = text;
+  statusEl.classList.toggle('ok', ok);
+}
+async function checkSupport() {
+  if (!('xr' in navigator)) {
+    setStatus('Open this page in the Meta Quest Browser to play in your room. The preview here works with a mouse.');
+    return;
+  }
+  const supported = async (t) => { try { return await navigator.xr.isSessionSupported(t); } catch (e) { return false; } };
+  const [ar, vr] = await Promise.all([supported('immersive-ar'), supported('immersive-vr')]);
+  btnAR.disabled = !ar;
+  btnVR.disabled = !vr;
+  if (ar) {
+    setStatus('Headset found. Press "Play in your room" and allow access to your room when asked.', true);
+    document.getElementById('send').hidden = true;
+  } else if (vr) setStatus('VR is available here, but mixed reality is not.', true);
+  else setStatus('No headset found. Open this page in the Meta Quest Browser to play. The preview here works with a mouse.');
+}
+
+// ---------- page controls ----------
+function syncSettingsUI() {
+  document.getElementById(`mode-${settings.mode}`).checked = true;
+  document.getElementById(`level-${settings.level}`).checked = true;
+  document.getElementById(`color-${settings.color}`).checked = true;
+  document.querySelectorAll('input[name="size"]').forEach((el) => { el.checked = el.value === settings.size; });
+  document.getElementById('tint').checked = settings.tint;
+  document.getElementById('seg-note').textContent = `${MODES[settings.mode].note} ${lvl().note}`;
+  document.getElementById('size-note').textContent = court.fill
+    ? 'The court stretches over your whole wall, edge to edge and nearly to the ceiling.'
+    : `${court.w.toFixed(1)} m wide, top line at ${court.h.toFixed(1)} m. In the headset you can also draw it yourself: menu, then "Draw the court".`;
+}
+document.querySelectorAll('input[name="mode"], input[name="level"]').forEach((el) => {
+  el.addEventListener('change', () => { if (el.checked) setSetting(el.name, el.value); });
+});
+document.querySelectorAll('input[name="size"]').forEach((el) => {
+  el.addEventListener('change', () => { if (el.checked) setSize(el.value); });
+});
+document.querySelectorAll('input[name="color"]').forEach((el) => {
+  el.addEventListener('change', () => {
+    if (!el.checked) return;
+    settings.color = el.value;
+    store.set('hc-color', el.value);
+    applyColor();
+  });
+});
+document.getElementById('tint').addEventListener('change', (e) => setTint(e.target.checked));
+document.getElementById('new-ball').addEventListener('click', () => { initAudio(); takeOver(); respawnBall(); });
+const urlEl = document.getElementById('url');
+urlEl.textContent = (location.origin + location.pathname).replace(/^https?:\/\//, '').replace(/index\.html$/, '');
+document.getElementById('copy').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  try {
+    await navigator.clipboard.writeText(urlEl.textContent);
+    btn.textContent = 'Copied';
+  } catch (err) {
+    const range = document.createRange();
+    range.selectNodeContents(urlEl);
+    const sel = window.getSelection();
+    sel.removeAllRanges(); sel.addRange(range);
+    btn.textContent = 'Selected';
+  }
+  setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
+});
+
+syncSettingsUI();
+setMode('desktop');
+newGame();
+resize();
+renderer.setAnimationLoop(frame);
+checkSupport();
+if (document.fonts && document.fonts.load) {
+  Promise.all([document.fonts.load("800 64px Archivo"), document.fonts.load("500 30px Inter")])
+    .then(() => { popTex.forEach((t) => t.dispose()); popTex.clear(); dirty = true; })
+    .catch(() => {});
+}
+
+if (DEBUG) {
+  window.__hc = {
+    game, settings, ballPos, ballVel, camera, deskPaddle, planeMap, servePt,
+    get front() { return front; }, get colliders() { return colliders; }, get marks() { return marks; }, get mode() { return mode; },
+    setMode, syncPlanes, frontFromPlane, lockWall, enterAim, enterServe, newGame, takeOver, swing, step, aimCandidate,
+    court, refitFront, setSize, applyColor, respawnBall, menu, menuRows, drawMenu, menuMesh, xrPaddles, updatePalm, collidePaddle,
+    THREE, scene, room, planeLines, renderer, menuCanvas, setTint, cycleColor, settings_: settings,
+    shape, enterShape, startShape, updateShape, finishShape, wallPoint,
+    set aimOverride(o) { aimOverride = o; },
+    setDemoText(v) { showDemoText = v; headsetText = !v; dirty = true; },
+    // tutorial recording: stop the live loop and step the game by hand with a fixed time step
+    stopLoop() { renderer.setAnimationLoop(null); },
+    stepFrame(timeMs, dt) { frame(timeMs, null, dt); },
+    setView(w, h) { viewLocked = true; renderer.setPixelRatio(1); renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); },
+    hookSfx(cb) { Object.keys(sfx).forEach((k) => { const orig = sfx[k]; sfx[k] = (...a) => { cb(k, a[0]); orig(...a); }; }); },
+  };
+}
+</script>
+</body>
+</html>
