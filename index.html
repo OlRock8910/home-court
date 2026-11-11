@@ -150,6 +150,7 @@ section h2 { font-family: var(--display); font-weight: 700; font-size: 13px; let
           <div class="opts">
             <label><input type="radio" name="mode" value="rally" id="mode-rally"><span>Rally</span></label>
             <label><input type="radio" name="mode" value="attack" id="mode-attack"><span>Target attack</span></label>
+            <label><input type="radio" name="mode" value="punch" id="mode-punch"><span>Punch bag</span></label>
           </div>
         </fieldset>
         <fieldset class="seg">
@@ -171,6 +172,15 @@ section h2 { font-family: var(--display); font-weight: 700; font-size: 13px; let
           </div>
         </fieldset>
         <p class="seg-note" id="size-note"></p>
+        <fieldset class="seg">
+          <legend>Court lines</legend>
+          <div class="opts">
+            <label><input type="radio" name="lines" value="corners" id="lines-corners"><span>Corners</span></label>
+            <label><input type="radio" name="lines" value="full" id="lines-full"><span>Full box</span></label>
+            <label><input type="radio" name="lines" value="tin" id="lines-tin"><span>Tin only</span></label>
+          </div>
+        </fieldset>
+        <p class="seg-note">Corners keeps your wall clear: only the low tin line and small corner marks are drawn.</p>
         <fieldset class="seg">
           <legend>Court colour</legend>
           <div class="swatches">
@@ -217,14 +227,16 @@ section h2 { font-family: var(--display); font-weight: 700; font-size: 13px; let
   <section class="block" aria-labelledby="h-controls">
     <h2 id="h-controls">Controls</h2>
     <dl class="grid">
-      <div><dt>Swing</dt><dd>Each controller holds a bat. Swing harder to hit harder.</dd></div>
+      <div><dt>Swing</dt><dd>Each controller holds a racket. Swing harder to hit harder.</dd></div>
+      <div><dt><kbd>Grip</kbd></dt><dd>Hold the ball. Move your arm and let go to throw it.</dd></div>
       <div><dt><kbd>Trigger</kbd></dt><dd>Pick the wall, choose in the menu, or start a new game.</dd></div>
       <div><dt><kbd>A</kbd> or <kbd>X</kbd></dt><dd>New ball in front of you, any time.</dd></div>
       <div><dt><kbd>B</kbd> or <kbd>Y</kbd></dt><dd>Open the menu: new ball, court size, colour, mode, level, another wall.</dd></div>
       <div><dt>Thumbstick</dt><dd>Left and right: court width. Up and down: court height.</dd></div>
       <div><dt>Draw the court</dt><dd>In the menu, choose "Draw the court". Point at one corner, hold the trigger, drag to the opposite corner and let go.</dd></div>
       <div><dt>Whole wall</dt><dd>Pick "Whole wall" as the court size, or turn on "Fill the whole wall" in the menu.</dd></div>
-      <div><dt>Bare hands</dt><dd>Put the controllers down. Hit with your open palm. Quick pinch: new ball. Pinch and hold: menu.</dd></div>
+      <div><dt>Bare hands</dt><dd>Put the controllers down. Hit with your open palm, pinch the ball to pick it up, quick pinch for a new ball, pinch and hold for the menu.</dd></div>
+      <div><dt>Punch bag</dt><dd>Pick the Punch bag mode. The racket becomes a pair of gloves and a heavy bag hangs in front of you.</dd></div>
     </dl>
     <p class="note">The Quest's own ≡ button belongs to the headset, so web games cannot use it. The game pauses while the Quest menu is open and shows its own menu when you come back.</p>
   </section>
@@ -274,7 +286,9 @@ const LEVELS = {
 const MODES = {
   rally:  { label: 'Rally', note: 'Rally: 3 balls. Keep it going as long as you can.' },
   attack: { label: 'Target attack', note: 'Target attack: 60 seconds and endless balls. Targets are worth 5.' },
+  punch:  { label: 'Punch bag', note: 'Punch bag: 60 seconds. No racket and no ball, just your fists.' },
 };
+const isPunch = () => settings.mode === 'punch';
 const ATTACK_TIME = 60;
 const settings = { mode: store.get('hc-mode', 'rally'), level: store.get('hc-level', 'casual') };
 if (!MODES[settings.mode]) settings.mode = 'rally';
@@ -288,6 +302,10 @@ const COLORS = { coral: 0xe3462a, cyan: 0x1fb6d1, violet: 0x7c5cff, pink: 0xff4f
 settings.size = store.get('hc-size', 'medium');
 settings.color = store.get('hc-color', 'coral');
 settings.tint = store.get('hc-tint', '0') === '1';
+// how much of the court to draw on your wall
+const LINE_STYLES = { corners: 'Corners', full: 'Full box', tin: 'Tin only' };
+settings.lines = store.get('hc-lines', 'corners');
+if (!LINE_STYLES[settings.lines]) settings.lines = 'corners';
 if (!SIZES[settings.size] && settings.size !== 'custom') settings.size = 'medium';
 if (!COLORS[settings.color]) settings.color = 'coral';
 const court = {
@@ -303,7 +321,7 @@ const R = 0.04;              // ball radius (m)
 const E_WALL = 0.82, E_FLOOR = 0.7, E_PAD = 0.55;
 const MAX_SPEED = 9;
 const TIN = 0.22;            // tin line height above the floor
-const BR = 0.08, BT = 0.007; // bat blade radius, half thickness
+const BR = 0.088, BT = 0.007; // racket string bed radius, half thickness
 const TARGET_R = 0.17;
 const SERVE_MIN_SPEED = 0.6; // a resting bat does not serve by accident
 const UP = new THREE.Vector3(0, 1, 0);
@@ -411,6 +429,19 @@ function finishRect(r) {
   r.front = false;
   return r;
 }
+// A scanned plane is reported as a polygon inside a bigger rectangle. Testing the rectangle
+// makes the ball bounce off thin air beside a table or a doorway, so test the polygon itself.
+function insideRect(c, x, z, margin = 0) {
+  if (x < c.minX - margin || x > c.maxX + margin || z < c.minZ - margin || z > c.maxZ + margin) return false;
+  const p = c.poly;
+  if (!p) return true;
+  let inside = false;
+  for (let i = 0, j = p.length - 1; i < p.length; j = i++) {
+    const xi = p[i][0], zi = p[i][1], xj = p[j][0], zj = p[j][1];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+  }
+  return inside;
+}
 const virtualColliders = [
   rectFrom(new THREE.Vector3(0, ROOM.h / 2, ROOM.front), new THREE.Vector3(0, 0, 1), new THREE.Vector3(1, 0, 0), ROOM.w / 2, ROOM.h / 2),
   rectFrom(new THREE.Vector3(-ROOM.w / 2, ROOM.h / 2, midZ), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 0, -1), depth / 2, ROOM.h / 2),
@@ -479,16 +510,29 @@ function buildMarkings(f) {
     m.position.set(x, y, 0); m.userData.strip = true; g.add(m);
   };
   if (settings.tint) strip(2 * f.hw, ztop - TIN, 0, (ztop + TIN) / 2, 0.16);   // paints the court area
-  strip(2 * f.hw, 0.03, 0, TIN, 1);                                   // tin
-  strip(2 * f.hw, 0.014, 0, ztop, 0.9);                               // out line
-  strip(0.014, ztop - TIN, -f.hw, (ztop + TIN) / 2, 0.75);            // side lines
-  strip(0.014, ztop - TIN, f.hw, (ztop + TIN) / 2, 0.75);
+  const style = game.noLines ? 'none' : settings.lines;
+  if (style !== 'none') strip(2 * f.hw, 0.03, 0, TIN, 1);             // the tin: always drawn
+  if (style === 'full') {
+    strip(2 * f.hw, 0.014, 0, ztop, 0.9);                             // out line
+    strip(0.014, ztop - TIN, -f.hw, (ztop + TIN) / 2, 0.75);          // side lines
+    strip(0.014, ztop - TIN, f.hw, (ztop + TIN) / 2, 0.75);
+  } else if (style === 'corners') {
+    // just the corners of the box, so your wall stays your wall
+    const armX = Math.min(0.3, f.hw * 0.42), armY = Math.min(0.3, (ztop - TIN) * 0.3), w = 0.016;
+    for (const sx of [-1, 1]) {
+      strip(armX, w, sx * (f.hw - armX / 2), ztop, 0.85);             // top corner, across
+      strip(w, armY, sx * f.hw, ztop - armY / 2, 0.85);               // top corner, down
+      strip(w, armY * 0.8, sx * f.hw, TIN + armY * 0.4, 0.6);         // bottom corner, up from the tin
+    }
+  }
+  target.visible = !game.noLines;
   g.add(target);
   g.add(hud);
   // the score board sits above the court, or just inside its top edge when the court reaches the ceiling
   const roomAbove = f.top - ztop > 0.5;
   hud.position.set(0, roomAbove ? ztop + 0.26 : ztop - 0.3, 0.012);
-  if (!f.plane && mode === 'ar') {
+  if (!f.plane && mode === 'ar' && game.state === 'aim') {
+    // only while you are placing a wall that your room scan does not know about
     glassWall.visible = true;
     glassWall.scale.set(2 * f.hw + 0.6, f.top, 1);
     glassWall.position.set(0, f.top / 2, -0.004);
@@ -624,24 +668,125 @@ function updatePopups(dt) {
 }
 
 // ---------- bats ----------
+// ---------- the racket ----------
+// Outline of a squash head: a teardrop, widest near the tip and pinched at the throat.
+const HEAD_L = 0.105, HEAD_W = BR;
+function headOutline(scale = 1) {
+  const pts = [];
+  for (let i = 0; i < 72; i++) {
+    const t = (i / 72) * Math.PI * 2;
+    const taper = 0.55 + 0.45 * ((1 + Math.cos(t)) / 2);
+    pts.push(new THREE.Vector2(HEAD_L * scale * Math.cos(t), HEAD_W * scale * Math.sin(t) * taper));
+  }
+  return pts;
+}
+function stringTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const x = c.getContext('2d');
+  x.clearRect(0, 0, 256, 256);
+  x.strokeStyle = '#f2f3f5';
+  x.lineWidth = 3.2;
+  for (let i = 10; i < 256; i += 15) {
+    x.beginPath(); x.moveTo(i, 0); x.lineTo(i, 256); x.stroke();
+    x.beginPath(); x.moveTo(0, i); x.lineTo(256, i); x.stroke();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+function gripTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const x = c.getContext('2d');
+  x.fillStyle = '#1b1d21'; x.fillRect(0, 0, 128, 128);
+  x.strokeStyle = 'rgba(0,0,0,0.55)'; x.lineWidth = 7;
+  for (let i = -128; i < 256; i += 26) { x.beginPath(); x.moveTo(i, 0); x.lineTo(i + 128, 128); x.stroke(); }
+  x.strokeStyle = 'rgba(255,255,255,0.10)'; x.lineWidth = 2.5;
+  for (let i = -128; i < 256; i += 26) { x.beginPath(); x.moveTo(i + 5, 0); x.lineTo(i + 133, 128); x.stroke(); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 1);
+  return t;
+}
+const stringTex = stringTexture(), gripTex = gripTexture();
+const graphite = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.38, metalness: 0.25 });
+const gripMat = new THREE.MeshStandardMaterial({ map: gripTex, roughness: 0.85 });
+function strut(from, to, r0, r1, mat) {
+  const dir = new THREE.Vector3().subVectors(to, from);
+  const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, dir.length(), 10), mat);
+  m.position.copy(from).addScaledVector(dir, 0.5);
+  m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.clone().normalize());
+  return m;
+}
 function makePaddle() {
   const group = new THREE.Group();
   const holder = new THREE.Group();          // blade frame: its local X axis is the face normal
-  holder.position.set(0, 0.03, -0.15);
+  holder.position.set(0, 0.035, -0.24);
   group.add(holder);
-  const wood = new THREE.MeshStandardMaterial({ color: 0xc9a273, roughness: 0.55 });
-  const core = new THREE.Mesh(new THREE.CylinderGeometry(BR, BR, 0.006, 48), wood);
-  core.rotation.z = Math.PI / 2;
-  holder.add(core);
-  const red = new THREE.Mesh(new THREE.CylinderGeometry(BR - 0.002, BR - 0.002, 0.004, 48), new THREE.MeshStandardMaterial({ color: 0xb3162a, roughness: 0.75 }));
-  red.rotation.z = Math.PI / 2; red.position.x = 0.005; holder.add(red);
-  const black = new THREE.Mesh(new THREE.CylinderGeometry(BR - 0.002, BR - 0.002, 0.004, 48), new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 0.8 }));
-  black.rotation.z = Math.PI / 2; black.position.x = -0.005; holder.add(black);
-  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.016, 0.1, 20), wood);
-  handle.rotation.x = Math.PI / 2;
-  handle.position.set(0, 0.015, -0.03);
-  group.add(handle);
+
+  // the head sits in the YZ plane, so build it flat and turn it to face along local X
+  const head = new THREE.Group();
+  head.rotation.y = Math.PI / 2;
+  holder.add(head);
+
+  const outline = headOutline();
+  const bed = new THREE.Mesh(
+    new THREE.ShapeGeometry(new THREE.Shape(headOutline(0.93))),
+    new THREE.MeshStandardMaterial({ map: stringTex, transparent: true, alphaTest: 0.4, side: THREE.DoubleSide, roughness: 0.55 })
+  );
+  stringTex.repeat.set(1 / (2 * HEAD_L), 1 / (2 * HEAD_W));
+  stringTex.offset.set(0.5, 0.5);
+  head.add(bed);
+
+  const rim = new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(outline.map((p) => new THREE.Vector3(p.x, p.y, 0)), true), 96, 0.0055, 8, true),
+    graphite
+  );
+  head.add(rim);
+  // a thin band of the court colour around the top of the frame
+  const band = new THREE.MeshStandardMaterial({ color: courtColor.clone(), roughness: 0.35, metalness: 0.3 });
+  colorMats.push(band);
+  const bandPts = outline.filter((p) => p.x > HEAD_L * 0.25);
+  if (bandPts.length > 2) {
+    head.add(new THREE.Mesh(
+      new THREE.TubeGeometry(new THREE.CatmullRomCurve3(bandPts.map((p) => new THREE.Vector3(p.x, p.y, 0))), 48, 0.0062, 8, false),
+      band
+    ));
+  }
+
+  // throat struts from the head down to the handle, then the grip
+  const shaft = new THREE.Group();
+  group.add(shaft);
+  const throat = new THREE.Vector3(0, 0.035, -0.24 + HEAD_L);
+  for (const s of [-1, 1]) {
+    shaft.add(strut(new THREE.Vector3(s * 0.021, throat.y, throat.z - 0.012), new THREE.Vector3(s * 0.007, 0.02, -0.062), 0.004, 0.0065, graphite));
+  }
+  shaft.add(strut(new THREE.Vector3(0, 0.02, -0.068), new THREE.Vector3(0, 0.012, 0.072), 0.0145, 0.0175, gripMat));
+  const butt = new THREE.Mesh(new THREE.CylinderGeometry(0.019, 0.016, 0.012, 16), graphite);
+  butt.position.set(0, 0.012, 0.075);
+  butt.rotation.x = Math.PI / 2;
+  shaft.add(butt);
+
+  // a boxing glove, used instead of the racket in punch bag mode
+  const glove = new THREE.Group();
+  const mitt = new THREE.Mesh(new THREE.SphereGeometry(0.075, 20, 14), new THREE.MeshStandardMaterial({ color: 0xc8302a, roughness: 0.62 }));
+  mitt.scale.set(1, 0.86, 1.12);
+  mitt.position.set(0, 0, -0.035);
+  glove.add(mitt);
+  const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.032, 14, 10), new THREE.MeshStandardMaterial({ color: 0xb02a24, roughness: 0.62 }));
+  thumb.position.set(0.055, -0.012, -0.012);
+  glove.add(thumb);
+  const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.075, 18), new THREE.MeshStandardMaterial({ color: 0xf1efe9, roughness: 0.85 }));
+  cuff.rotation.x = Math.PI / 2;
+  cuff.position.set(0, 0, 0.05);
+  glove.add(cuff);
+  glove.visible = false;
+  group.add(glove);
+
   return {
+    head, shaft, glove,
     group, holder, batHolder: holder, r: BR, t: BT, grip: null, ctrl: null,
     prev: new THREE.Vector3(), vel: new THREE.Vector3(), cd: 0, source: null, ready: false, on: false,
     poseVel: false, pressT: -1, hand: '', isHand: false, tracked: true, aPrev: false, bPrev: false,
@@ -727,20 +872,30 @@ for (let i = 0; i < 2; i++) {
     p.group.visible = !p.isHand;
     p.palm.visible = p.isHand;
     p.aPrev = p.bPrev = false;
+    setLook();
   });
   ctrl.addEventListener('disconnected', () => {
     p.source = null; p.on = false; p.isHand = false; p.pressT = -1;
     p.group.visible = false; p.palm.visible = false;
   });
-  ctrl.addEventListener('selectstart', () => { p.pressT = performance.now(); onTrigger(p); });
+  ctrl.addEventListener('selectstart', () => {
+    p.pressT = performance.now();
+    if (p.isHand && !menu.open && canGrab(p)) return grabBall(p);   // pinch the ball to pick it up
+    onTrigger(p);
+  });
   ctrl.addEventListener('selectend', () => {
+    if (grab.p === p) { releaseBall(); p.pressT = -1; return; }     // let go to throw it
     // bare hands have no A button: a quick pinch during a rally brings a new ball
     if (game.state === 'shape' && !menu.open) { finishShape(p); p.pressT = -1; return; }
     const quick = p.pressT > 0 && performance.now() - p.pressT < 400;
     if (p.isHand && quick && !menu.open && (game.state === 'rally' || game.state === 'missed')) respawnBall();
     p.pressT = -1;
   });
-  ctrl.addEventListener('squeezestart', onGrip);
+  ctrl.addEventListener('squeezestart', () => {
+    initAudio();
+    if (!menu.open && canGrab(p)) grabBall(p); else onGrip();       // grip near the ball picks it up
+  });
+  ctrl.addEventListener('squeezeend', () => { if (grab.p === p) releaseBall(); });
   xrPaddles.push(p);
 }
 function activePaddles() {
@@ -826,6 +981,7 @@ const sfx = {
   floor: (v, p) => knock(150, 0.08, 0.22 * strength(v), 0.14 * strength(v), 600, p),
   target: () => { tone(784, 0.25, 0.18); tone(1175, 0.35, 0.16, 0.09); },
   level: () => { tone(659, 0.18, 0.12); tone(988, 0.25, 0.12, 0.08); },
+  thud: (v, p) => { knock(92, 0.24, 0.45 * strength(v), 0.5 * strength(v), 210, p); knock(185, 0.09, 0.2 * strength(v), 0.12 * strength(v), 760, p); },
   fault: () => { tone(392, 0.25, 0.14); tone(294, 0.4, 0.12, 0.14); },
   end: () => { tone(523, 0.2, 0.14); tone(392, 0.2, 0.12, 0.16); tone(262, 0.5, 0.12, 0.32); },
 };
@@ -862,16 +1018,35 @@ function enterServe() {
   ballPos.copy(servePt);
   prevPos.copy(servePt);
   ballVel.set(0, 0, 0);
-  rolling = false;
+  rolling = false; stillT = 0;
   dirty = true;
 }
 function newGame() {
-  game.score = 0; game.balls = 3; game.msg = '';
+  game.score = 0; game.balls = 3; game.msg = ''; game.punches = 0;
   game.timeLeft = ATTACK_TIME; game.clockOn = false;
+  game.noLines = isPunch();
   loadBest();
+  setLook();
+  if (isPunch()) {
+    placeBag();
+    if (front) buildMarkings(front);     // keep the scoreboard, drop the court lines
+  } else if (bag) {
+    bag.visible = false;
+  }
   moveTarget();
   enterServe();
   for (const p of xrPaddles) p.pressT = -1;
+}
+// racket for the ball games, boxing gloves for the punch bag
+function setLook() {
+  const punch = isPunch();
+  for (const p of [deskPaddle, ...xrPaddles]) {
+    if (p.head) p.head.visible = !punch && !p.isHand;
+    if (p.shaft) p.shaft.visible = !punch && !p.isHand;
+    if (p.glove) p.glove.visible = punch && !p.isHand;
+    // with gloves the hit point is your fist, not a racket head out in front
+    if (p.batHolder) p.batHolder.position.set(0, punch ? 0.0 : 0.035, punch ? -0.02 : -0.24);
+  }
 }
 function addScore(n) {
   game.score += n;
@@ -961,8 +1136,141 @@ function onBounce(kind, point, normal, speed) {
   }
 }
 
+// ---------- punch bag ----------
+const BAG_L = 1.0, BAG_R = 0.17, BAG_H = 0.95, PUNCH_MIN = 1.1;
+const bagPivot = new THREE.Vector3(), bagOff = new THREE.Vector3(), bagVel = new THREE.Vector3();
+const BAG_UP = new THREE.Vector3(0, 1, 0), BAG_DOWN = new THREE.Vector3(0, -1, 0);
+let bag = null, bagBody = null, bagHitT = 0;
+
+function leatherTexture() {
+  const c = document.createElement('canvas');
+  c.width = 256; c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = '#7d1b18'; x.fillRect(0, 0, 256, 256);
+  for (let i = 0; i < 2600; i++) {
+    x.fillStyle = i % 2 ? 'rgba(255,255,255,0.045)' : 'rgba(0,0,0,0.07)';
+    x.fillRect((i * 89) % 256, (i * 61) % 256, 3, 3);
+  }
+  x.fillStyle = '#5d120f';
+  for (const y of [40, 216]) x.fillRect(0, y, 256, 10);
+  x.strokeStyle = 'rgba(235,225,210,0.55)'; x.lineWidth = 2; x.setLineDash([7, 9]);
+  for (const y of [45, 221]) { x.beginPath(); x.moveTo(0, y); x.lineTo(256, y); x.stroke(); }
+  x.setLineDash([]);
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 1);
+  return t;
+}
+function makeBag() {
+  const g = new THREE.Group();
+  bagBody = new THREE.Mesh(
+    new THREE.CylinderGeometry(BAG_R, BAG_R * 0.97, BAG_H, 28, 1, false),
+    new THREE.MeshStandardMaterial({ map: leatherTexture(), roughness: 0.72 })
+  );
+  g.add(bagBody);
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x4e0f0d, roughness: 0.7 });
+  for (const s of [1, -1]) {
+    const cap = new THREE.Mesh(new THREE.SphereGeometry(BAG_R * 0.98, 24, 10, 0, Math.PI * 2, 0, Math.PI / 2), capMat);
+    cap.position.y = s * BAG_H / 2;
+    cap.scale.y = s * 0.45;
+    g.add(cap);
+  }
+  // straps up to the ceiling anchor
+  const strapMat = new THREE.MeshStandardMaterial({ color: 0x2b2d31, roughness: 0.6, metalness: 0.4 });
+  const top = BAG_H / 2;
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2;
+    g.add(strut(new THREE.Vector3(Math.cos(a) * BAG_R * 0.8, top - 0.02, Math.sin(a) * BAG_R * 0.8),
+                new THREE.Vector3(0, top + 0.16, 0), 0.008, 0.008, strapMat));
+  }
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.035, 0.009, 8, 20), strapMat);
+  ring.position.y = top + 0.19;
+  ring.rotation.x = Math.PI / 2;
+  g.add(ring);
+  const rope = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, BAG_L - top - 0.19, 8), strapMat);
+  rope.position.y = top + 0.19 + (BAG_L - top - 0.19) / 2;
+  g.add(rope);
+  g.visible = false;
+  scene.add(g);
+  return g;
+}
+function placeBag() {
+  if (!bag) bag = makeBag();
+  const fwd = T.a.set(0, 0, -1);
+  if (mode !== 'desktop') {
+    const cam = renderer.xr.getCamera();
+    cam.getWorldPosition(headPos);
+    fwd.transformDirection(cam.matrixWorld);
+  }
+  fwd.y = 0;
+  if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -1);
+  fwd.normalize();
+  const base = mode === 'desktop' ? T.b.set(0, 1.5, 0.35) : headPos;
+  bagPivot.copy(base).addScaledVector(fwd, 1.25);
+  bagPivot.y = floorY + BAG_L + BAG_H / 2 + 0.78;   // bag hangs from hip height to above your head
+  bagOff.set(0, 0, 0);
+  bagVel.set(0, 0, 0);
+}
+function stepBag(dt) {
+  if (!bag) return;
+  // a weight on a rope: pulled back to the middle, and slowed down a little
+  const k = 9.4 / BAG_L;
+  bagVel.addScaledVector(bagOff, -k * dt);
+  bagVel.multiplyScalar(Math.max(0, 1 - 1.15 * dt));
+  bagOff.addScaledVector(bagVel, dt);
+  bagOff.y = 0;
+  const reach = BAG_L * 0.72;
+  if (bagOff.length() > reach) { bagOff.setLength(reach); bagVel.multiplyScalar(0.4); }
+  const drop = Math.sqrt(Math.max(0.04, BAG_L * BAG_L - bagOff.lengthSq()));
+  T.c.set(bagOff.x, -drop, bagOff.z);
+  bag.position.copy(bagPivot).add(T.c);
+  bag.quaternion.setFromUnitVectors(BAG_DOWN, T.c.normalize());
+  bag.visible = true;
+}
+// in punch mode the hit frame already sits at your hand, so that is the fist
+function fistPoint(p, out) { return p.holder.getWorldPosition(out); }
+function punchCheck(dt) {
+  if (!bag) return;
+  bagHitT += dt;
+  for (const p of activePaddles()) {
+    p.punchCd = Math.max(0, (p.punchCd || 0) - dt);
+    if (p.punchCd > 0) continue;
+    const speed = p.vel.length();
+    if (speed < PUNCH_MIN) continue;
+    fistPoint(p, T.d);
+    // closest point on the bag's centre line, then the distance out to the fist
+    const half = BAG_H / 2;
+    T.e.copy(T.d).sub(bag.position);
+    T.f.set(0, 1, 0).applyQuaternion(bag.quaternion);
+    const along = THREE.MathUtils.clamp(T.e.dot(T.f), -half, half);
+    T.g.copy(bag.position).addScaledVector(T.f, along);
+    const away = T.h.copy(T.d).sub(T.g);
+    const dist = away.length();
+    if (dist > BAG_R + 0.1) continue;
+    if (T.i.copy(p.vel).normalize().dot(away.clone().normalize()) > -0.15) continue;  // must be moving into it
+    p.punchCd = 0.22;
+    const push = T.i.copy(p.vel); push.y *= 0.35;
+    bagVel.addScaledVector(push, 0.42 / BAG_L);
+    bagVel.y = 0;
+    const power = Math.min(12, speed);
+    const combo = bagHitT < 1.6;
+    bagHitT = 0;
+    game.punches = (game.punches || 0) + 1;
+    if (combo) game.returns += 1; else game.returns = 0;
+    addScore((1 + Math.floor(power / 2.5)) * multiplier());
+    popup(`${Math.round(power * 10) / 10} m/s`, T.g.clone().addScaledVector(away.normalize(), BAG_R + 0.12), power > 6 ? '#ff7a5c' : '#ffffff', power > 6);
+    ripple(T.g.clone().addScaledVector(away, BAG_R), away.clone(), power > 6 ? 0xff7a5c : 0xffffff, 0.12, 0.4);
+    sfx.thud(power, T.g);
+    buzz(p, THREE.MathUtils.clamp(power / 8, 0.35, 1), 60);
+    if (game.state === 'serve') { game.state = 'rally'; game.clockOn = true; }
+    dirty = true;
+  }
+}
+
 // ---------- physics ----------
 // Help weak shots reach the wall. Casual also keeps them inside the court lines.
+const assistBefore = new THREE.Vector3(), assistDelta = new THREE.Vector3();
 function assist() {
   const a = lvl().assist;
   if (ballVel.length() > MAX_SPEED) ballVel.setLength(MAX_SPEED);   // cap first so the guidance below is not undone
@@ -971,8 +1279,11 @@ function assist() {
     const toward = T.f.copy(front.n).negate();
     const d = Math.max(0.2, T.g.copy(ballPos).sub(front.O).dot(front.n));
     let along = ballVel.dot(toward);
+    // A weak or mis-angled shot is given enough speed to reach the wall. This is a floor on the
+    // shot, like swinging harder, so it is not clamped below: only the aiming is.
     const minAlong = a === 2 ? Math.max(2.0, d / 1.0) : Math.max(1.4, d / 1.3);
     if (along < minAlong) { ballVel.addScaledVector(toward, minAlong - along); along = minAlong; }
+    assistBefore.copy(ballVel);
     const t = d / along;
     const y0 = ballPos.y - floorY;
     const fall = 0.5 * g * t * t;
@@ -987,7 +1298,19 @@ function assist() {
       const xAt = side + vu * t, lim = front.hw - 0.12;
       if (Math.abs(xAt) > lim) ballVel.addScaledVector(front.u, (Math.sign(xAt) * lim - side) / t - vu);
     }
+    // Clamp only the horizontal aiming change. The vertical fix (keeping the ball off the
+    // floor and above the tin) is mandatory, not cosmetic, so it stays unclamped.
+    const most = a === 2 ? 2.2 : 1.2;
+    const savedY = ballVel.y;
+    assistDelta.copy(ballVel).sub(assistBefore);
+    assistDelta.y = 0;
+    if (assistDelta.length() > most) {
+      ballVel.copy(assistBefore).addScaledVector(assistDelta.normalize(), most);
+      ballVel.y = savedY;
+    }
   }
+  ballVel.y = THREE.MathUtils.clamp(ballVel.y, -MAX_SPEED, 3.2);    // never balloon toward the ceiling
+  if (ballVel.length() > MAX_SPEED) ballVel.setLength(MAX_SPEED);
 }
 
 // Swept test between the ball and a bat's blade (a thin disc whose normal is the blade's local X).
@@ -1024,7 +1347,7 @@ const pushFrom = new THREE.Vector3();
 // positionOnly: just move the ball back to the right side (used after a bat push), no bounce
 function collideRect(c, positionOnly = false) {
   const lp = T.a.copy(ballPos).applyMatrix4(c.inv);
-  if (lp.x < c.minX - R || lp.x > c.maxX + R || lp.z < c.minZ - R || lp.z > c.maxZ + R) return;
+  if (!insideRect(c, lp.x, lp.z, R)) return;
   const pp = T.b.copy(prevPos).applyMatrix4(c.inv);
   const side = pp.y >= 0 ? 1 : -1;
   if (side * lp.y >= R) return;
@@ -1033,10 +1356,11 @@ function collideRect(c, positionOnly = false) {
   lp.y = side * R;
   ballPos.copy(lp.applyMatrix4(c.m));
   if (positionOnly || vn >= 0) return;
-  if (c.up && side > 0 && -vn < 0.4) {
-    // settling on a table or sofa: stop the jitter and let it roll to a stop
+  if (c.up && side > 0 && -vn < 0.45) {
+    // Landing softly on a table or a sofa. Take out the downward speed and add friction so the
+    // ball rolls off instead of hanging in the air. checkRally ends the point if it stops here.
     ballVel.addScaledVector(n, -vn);
-    ballVel.multiplyScalar(0.97);
+    ballVel.multiplyScalar(0.9);
     return;
   }
   ballVel.addScaledVector(n, -(1 + E_WALL) * vn);
@@ -1044,7 +1368,7 @@ function collideRect(c, positionOnly = false) {
   if (-vn > 0.3 || c.front) onBounce(c.front ? 'front' : 'other', T.e.copy(ballPos).addScaledVector(n, -R), n.clone(), -vn);
 }
 
-let rolling = false;
+let rolling = false, stillT = 0, lastDt = 1 / 60;
 function step(h) {
   prevPos.copy(ballPos);
   ballVel.y -= lvl().grav * h;
@@ -1076,7 +1400,11 @@ function checkRally() {
   if (game.state !== 'rally') return;
   const dx = ballPos.x - headPos.x, dz = ballPos.z - headPos.z;
   if (Math.hypot(dx, dz) > 7 || ballPos.y < floorY - 0.5 || ballPos.y > floorY + 6) return lose('Out of reach');
-  if (ballVel.length() < 0.3 && ballPos.y < surfaceBelow(ballPos) + R + 0.02) lose('The ball stopped');
+  // Resting on the floor or a table ends the point. A ball that hangs in mid-air is a glitch,
+  // so give it a moment (the top of a lob is briefly slow too) and then end the point.
+  const resting = ballPos.y < surfaceBelow(ballPos) + R + 0.05;
+  if (ballVel.length() < 0.35) stillT += lastDt; else stillT = 0;
+  if (stillT > (resting ? 0.25 : 0.7)) lose('The ball stopped');
 }
 
 // highest up-facing surface under the ball (floor, table, sofa…)
@@ -1085,7 +1413,7 @@ function surfaceBelow(pos) {
   for (const c of colliders) {
     if (!c.up || c.h <= best || c.h >= pos.y) continue;
     const l = T.k.copy(pos).applyMatrix4(c.inv);
-    if (l.x >= c.minX && l.x <= c.maxX && l.z >= c.minZ && l.z <= c.maxZ) best = c.h;
+    if (insideRect(c, l.x, l.z)) best = c.h;
   }
   return best;
 }
@@ -1123,7 +1451,7 @@ function syncPlanes(frame, ref) {
       minZ = Math.min(minZ, p.z); maxZ = Math.max(maxZ, p.z);
       pts.push(new THREE.Vector3(p.x, 0, p.z));
     }
-    const rect = finishRect({ m, minX, maxX, minZ, maxZ, plane: pl });
+    const rect = finishRect({ m, minX, maxX, minZ, maxZ, plane: pl, poly: pl.polygon.map((q) => [q.x, q.z]) });
     if (pl.orientation) rect.vertical = pl.orientation === 'vertical';
     const label = pl.semanticLabel || '';
     // floor: labelled as one, or the lowest flat surface near where we expect the floor
@@ -1177,8 +1505,7 @@ function aimCandidate() {
     if (Math.abs(ld.y) < 1e-4) continue;
     const t = -lo.y / ld.y;
     if (t < 0.3 || t > bestT) continue;
-    const hx = lo.x + ld.x * t, hz = lo.z + ld.z * t;
-    if (hx < r.minX || hx > r.maxX || hz < r.minZ || hz > r.maxZ) continue;
+    if (!insideRect(r, lo.x + ld.x * t, lo.z + ld.z * t)) continue;
     best = rec; bestT = t;
   }
   if (best) return frontFromPlane(best, origin.clone().addScaledVector(dir, bestT), origin);
@@ -1339,9 +1666,49 @@ function exitShape() {
   if (game.prevState === 'over') { game.state = 'over'; dirty = true; } else enterServe();
   syncSettingsUI();
 }
+// ---------- picking the ball up and throwing it ----------
+const grab = { p: null, local: new THREE.Vector3() };
+const GRAB_REACH = 0.3;
+function canGrab(p) {
+  if (!p || !p.on || !p.tracked || grab.p || isPunch()) return false;
+  if (game.state !== 'serve' && game.state !== 'rally' && game.state !== 'missed') return false;
+  p.holder.getWorldPosition(T.a);
+  return T.a.distanceTo(ballPos) < GRAB_REACH;
+}
+function grabBall(p) {
+  grab.p = p;
+  grab.local.copy(ballPos);
+  p.holder.worldToLocal(grab.local);
+  if (grab.local.length() > 0.22) grab.local.setLength(0.12);
+  game.state = 'held';
+  ballVel.set(0, 0, 0);
+  stillT = 0;
+  buzz(p, 0.4, 30);
+  tone(560, 0.07, 0.07);
+  dirty = true;
+}
+function releaseBall() {
+  const p = grab.p;
+  grab.p = null;
+  if (!p) { enterServe(); return; }
+  ballVel.copy(p.vel).multiplyScalar(1.15);
+  if (ballVel.length() > MAX_SPEED) ballVel.setLength(MAX_SPEED);
+  prevPos.copy(ballPos);
+  stillT = 0;
+  p.cd = 0.25;   // the hand that threw it cannot also hit it on the same movement
+  // a throw puts the ball in play, but it is not a shot: you still have to hit it at the wall
+  game.state = 'rally';
+  game.wallSinceHit = true;
+  game.floorSinceHit = 0;
+  if (settings.mode === 'attack') game.clockOn = true;
+  buzz(p, 0.25, 20);
+  dirty = true;
+}
 function respawnBall() {
+  if (grab.p) { grab.p = null; }
   if (game.state === 'aim' || game.state === 'shape') return;
   if (game.state === 'over') { newGame(); return; }
+  if (isPunch()) { placeBag(); tone(660, 0.12, 0.1); return; }   // bring the bag back in front of you
   enterServe();
   tone(880, 0.12, 0.1);
 }
@@ -1353,7 +1720,9 @@ function lockWall(f) {
   lasers.forEach((l) => { l.visible = menu.open; });
   rebuildColliders();
   // the first wall starts a game; choosing another wall mid-game keeps the score, balls and clock
-  if (!game.wallLocked || game.prevState === 'over') newGame(); else enterServe();
+  if (!game.wallLocked || game.prevState === 'over') newGame();
+  else if (isPunch()) placeBag();
+  else enterServe();
   game.wallLocked = true;
   for (const p of xrPaddles) p.pressT = -1;   // a held pinch must not open the menu straight after
 }
@@ -1391,7 +1760,7 @@ function setSize(key) {
 }
 
 // ---------- in-headset menu (B or Y button; pinch and hold with bare hands) ----------
-const MENU_PX_W = 1024, MENU_HEAD = 132, MENU_ROW = 92, MENU_MAX_ROWS = 12;
+const MENU_PX_W = 1024, MENU_HEAD = 132, MENU_ROW = 92, MENU_MAX_ROWS = 13;
 const MENU_PX_H = MENU_HEAD + MENU_ROW * MENU_MAX_ROWS + 36;
 const menuCanvas = document.createElement('canvas');
 menuCanvas.width = MENU_PX_W; menuCanvas.height = MENU_PX_H;
@@ -1414,17 +1783,27 @@ const LEVEL_ORDER = ['casual', 'club', 'pro'];
 function menuRows() {
   const rows = [
     { label: 'Resume', act: () => closeMenu() },
-    { label: 'New ball', act: () => { closeMenu(); respawnBall(); } },
+    { label: isPunch() ? 'Move the bag to me' : 'New ball', act: () => { closeMenu(); respawnBall(); } },
   ];
   if (mode === 'ar') rows.push({ label: 'Choose a different wall', act: () => { closeMenu(); enterAim(); } });
   rows.push(
+    { label: 'Court lines', value: () => LINE_STYLES[settings.lines], act: () => {
+      const k = Object.keys(LINE_STYLES);
+      settings.lines = k[(k.indexOf(settings.lines) + 1) % k.length];
+      store.set('hc-lines', settings.lines);
+      if (front && game.state !== 'aim') buildMarkings(front);
+      syncSettingsUI();
+    } },
     { label: 'Fill the whole wall', value: () => (court.fill ? 'On' : 'Off'), act: () => setSize(court.fill ? 'medium' : 'wall') },
     { label: 'Draw the court', value: () => 'Drag corners', act: () => { closeMenu(); enterShape(); } },
     { label: 'Court width', value: () => `${(court.fill && front ? front.hw * 2 : court.w).toFixed(1)} m`, step: (d) => { unfill(); court.w = THREE.MathUtils.clamp(court.w + d * 0.2, 1.0, 4.0); settings.size = 'custom'; courtDirty = true; } },
     { label: 'Court height', value: () => `${(court.fill && marks ? marks.userData.ztop : court.h).toFixed(1)} m`, step: (d) => { unfill(); court.h = THREE.MathUtils.clamp(court.h + d * 0.1, 1.2, 2.6); settings.size = 'custom'; courtDirty = true; } },
     { label: 'Colour', value: () => cap(settings.color), swatch: true, act: () => cycleColor() },
     { label: 'Paint the court', value: () => (settings.tint ? 'On' : 'Off'), act: () => setTint(!settings.tint) },
-    { label: 'Mode', value: () => MODES[settings.mode].label, act: () => setSetting('mode', settings.mode === 'rally' ? 'attack' : 'rally') },
+    { label: 'Mode', value: () => MODES[settings.mode].label, act: () => {
+      const k = Object.keys(MODES);
+      setSetting('mode', k[(k.indexOf(settings.mode) + 1) % k.length]);
+    } },
     { label: 'Level', value: () => cap(settings.level), act: () => setSetting('level', LEVEL_ORDER[(LEVEL_ORDER.indexOf(settings.level) + 1) % 3]) },
     { label: 'Leave the game', act: () => { const s = renderer.xr.getSession(); if (s) s.end(); } },
   );
@@ -1542,10 +1921,8 @@ function onTrigger(p) {
   if (game.state === 'serve') enterServe();   // bring the ball back in front of you
 }
 function onGrip() {
-  initAudio();
   if (menu.open) return;
-  if (mode === 'ar' && game.state !== 'aim') enterAim();
-  else if (game.state === 'serve') enterServe();
+  if (game.state === 'serve') enterServe();   // nothing in reach: bring the ball back to you
 }
 
 const mouse = new THREE.Vector2(0.05, -0.2);
@@ -1577,11 +1954,16 @@ renderer.domElement.addEventListener('pointermove', (e) => {
   takeOver();
   setMouse(e);
 });
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 renderer.domElement.addEventListener('pointerdown', (e) => {
   if (!e.isTrusted) return;
   takeOver();
   setMouse(e);
+  if (e.button === 2) { initAudio(); if (canGrab(deskPaddle)) grabBall(deskPaddle); return; }
   swing();
+});
+renderer.domElement.addEventListener('pointerup', (e) => {
+  if (e.isTrusted && e.button === 2 && grab.p === deskPaddle) releaseBall();
 });
 renderer.domElement.addEventListener('keydown', (e) => {
   if (e.code === 'Space' || e.code === 'Enter') { e.preventDefault(); takeOver(); swing(); }
@@ -1618,8 +2000,8 @@ function moveDeskPaddle(dt) {
 let demoT = 0, demoZ = 0.05;
 function demoBot(dt) {
   let wantZ = 0.05;
-  if (game.state === 'rally' && game.wallSinceHit && ballVel.z > 0) wantZ = THREE.MathUtils.clamp(ballPos.z + 0.5, -1.5, 0.05);
-  demoZ += (wantZ - demoZ) * Math.min(1, dt * 5);
+  if (game.state === 'rally' && game.wallSinceHit && ballVel.z > 0) wantZ = THREE.MathUtils.clamp(ballPos.z + 0.45, -1.5, 0.05);
+  demoZ += (wantZ - demoZ) * Math.min(1, dt * 7);
   deskPlane.constant = -demoZ;
   const aim = T.h.copy(ballPos);
   aim.y = Math.max(aim.y, floorY + 0.3);
@@ -1630,7 +2012,7 @@ function demoBot(dt) {
   mouse.y += (aim.y - mouse.y) * k;
   if (swingT >= 0) return;
   if (game.state === 'serve') { demoT += dt; if (demoT > 1.3) { demoT = 0; swingT = 0; } }
-  else if (game.state === 'rally' && game.wallSinceHit && ballVel.z > 0 && ballPos.z > demoZ - 0.42 && ballPos.z < demoZ - 0.12 && ballPos.y < 2.0) swingT = 0;
+  else if (game.state === 'rally' && game.wallSinceHit && ballVel.z > 0 && ballPos.z > demoZ - 0.50 && ballPos.z < demoZ - 0.08 && ballPos.y < 2.0) swingT = 0;
   else if (game.state === 'over') { demoT += dt; if (demoT > 2.5) { demoT = 0; newGame(); } }
 }
 
@@ -1644,15 +2026,21 @@ let headsetText = false;   // debug/tutorial: show the headset wording on the pr
 function message() {
   const xr = mode !== 'desktop' || headsetText;
   if (game.demo && !xr && showDemoText) return 'Demo. Move the mouse here to play';
+  if (isPunch() && game.state !== 'aim' && game.state !== 'shape') {
+    if (game.state === 'over') return `Time. ${game.punches} punches. ${xr ? 'Pull the trigger' : 'Click'} to go again`;
+    if (game.state === 'serve') return xr ? 'Punch the bag to start the clock' : 'Swing the mouse into the bag';
+    return game.returns >= 2 ? `${game.punches} punches · streak ${game.returns}` : `${game.punches} punches`;
+  }
   switch (game.state) {
     case 'aim': return game.noPlanes ? 'No room scan found. Pull the trigger to place a wall' : 'Point at a wall and pull the trigger';
     case 'shape':
       if (shape.p) return 'Drag to the opposite corner, then let go';
       return shape.tooSmall ? 'Too small. Draw a bigger court' : 'Point at one corner of your court and hold the trigger';
+    case 'held': return xr ? 'Let go to throw it' : 'Let go of the right button to throw it';
     case 'serve': {
-      if (!xr) return 'Click to swing at the ball';
+      if (!xr) return 'Click to swing, or hold the right button to pick the ball up';
       const hands = xrPaddles.some((p) => p.on && p.isHand);
-      return hands ? 'Hit the ball with your palm. Pinch and hold: menu' : 'Swing through the ball. B or Y: menu';
+      return hands ? 'Hit it with your palm, or pinch the ball to pick it up' : 'Swing at the ball, or grip to pick it up';
     }
     case 'rally': return game.returns >= 2 ? `Rally of ${game.returns}` : '';
     case 'missed': return game.msg;
@@ -1669,7 +2057,7 @@ function drawHud() {
   c.strokeStyle = 'rgba(255,255,255,0.14)'; c.lineWidth = 3; c.stroke();
 
   const label = (t, x) => { c.fillStyle = '#9aa1aa'; c.font = "600 26px Inter, sans-serif"; c.fillText(t.split('').join(String.fromCharCode(8202)), x, 70); };
-  const attack = settings.mode === 'attack';
+  const attack = settings.mode === 'attack' || isPunch();
   label('SCORE', 56); label('BEST', 430); label(attack ? 'TIME' : 'BALLS', 690);
 
   c.fillStyle = '#ffffff';
@@ -1755,7 +2143,7 @@ function frame(time, xrFrame, forcedDt) {
   }
 
   if (!xr) {
-    if (game.demo) demoBot(dt);
+    if (game.demo && !isPunch()) demoBot(dt);
     moveDeskPaddle(dt);
   }
   scene.updateMatrixWorld(true);
@@ -1839,6 +2227,12 @@ function frame(time, xrFrame, forcedDt) {
     if (frames % 6 === 0) { aimFront = aimCandidate(); buildMarkings(aimFront); }
   } else if (game.state === 'shape') {
     updateShape();
+  } else if (isPunch()) {
+    stepBag(dt);
+    if (game.state !== 'over') punchCheck(dt);
+  } else if (game.state === 'held') {
+    if (!grab.p || !grab.p.on || !grab.p.tracked) releaseBall();
+    else { ballPos.copy(grab.local); grab.p.holder.localToWorld(ballPos); prevPos.copy(ballPos); }
   } else if (game.state === 'serve') {
     ballPos.copy(servePt);
     ballPos.y += Math.sin(time / 420) * 0.012;
@@ -1848,6 +2242,7 @@ function frame(time, xrFrame, forcedDt) {
     for (const p of activePaddles()) collidePaddle(p, T.h.copy(ballPos).addScaledVector(p.vel, dt));
     const steps = THREE.MathUtils.clamp(Math.ceil((ballVel.length() * dt) / 0.015), 1, 12);
     for (let i = 0; i < steps; i++) step(dt / steps);
+    lastDt = dt;
     checkRally();
     if (game.state === 'missed') {
       game.timer -= dt;
@@ -1855,7 +2250,7 @@ function frame(time, xrFrame, forcedDt) {
     }
   }
 
-  if (settings.mode === 'attack' && game.clockOn && !menu.open && game.state !== 'over' && game.state !== 'aim' && game.state !== 'shape') {
+  if ((settings.mode === 'attack' || isPunch()) && game.clockOn && !menu.open && game.state !== 'over' && game.state !== 'aim' && game.state !== 'shape') {
     game.timeLeft -= dt;
     if (game.timeLeft <= 0) endAttack();
     const s = Math.ceil(game.timeLeft);
@@ -1863,9 +2258,15 @@ function frame(time, xrFrame, forcedDt) {
   }
 
   // ball, its shadow and its landing spot
-  const showBall = game.state !== 'aim' && game.state !== 'shape';
+  const showBall = game.state !== 'aim' && game.state !== 'shape' && !isPunch();
   ball.visible = showBall;
   ball.position.copy(ballPos);
+  // a soft glow when the ball is close enough to pick up
+  const reachable = !grab.p && showBall && activePaddles().some((p) => {
+    p.holder.getWorldPosition(T.i);
+    return T.i.distanceTo(ballPos) < GRAB_REACH;
+  });
+  ball.material.emissiveIntensity = grab.p ? 0.5 : (reachable ? 0.35 : 0.12);
   const hv = Math.hypot(ballVel.x, ballVel.z);
   if (hv > 0.05) ball.rotateOnWorldAxis(T.i.set(ballVel.z, 0, -ballVel.x).normalize(), (hv / R) * dt * 0.5);
   const below = surfaceBelow(ballPos);
@@ -1876,7 +2277,7 @@ function frame(time, xrFrame, forcedDt) {
   shadow.material.opacity = THREE.MathUtils.clamp(1 - hgt / 2.2, 0.12, 0.9);
 
   marker.visible = false;
-  if (game.state === 'rally' && game.wallSinceHit) {
+  if (game.state === 'rally' && game.wallSinceHit && !isPunch()) {
     const g = lvl().grav, h0 = ballPos.y - floorY - R;
     const tl = (ballVel.y + Math.sqrt(Math.max(0, ballVel.y * ballVel.y + 2 * g * h0))) / g;
     if (tl > 0.12 && tl < 2.5) {
@@ -2009,6 +2410,7 @@ function syncSettingsUI() {
   document.getElementById(`mode-${settings.mode}`).checked = true;
   document.getElementById(`level-${settings.level}`).checked = true;
   document.getElementById(`color-${settings.color}`).checked = true;
+  document.getElementById(`lines-${settings.lines}`).checked = true;
   document.querySelectorAll('input[name="size"]').forEach((el) => { el.checked = el.value === settings.size; });
   document.getElementById('tint').checked = settings.tint;
   document.getElementById('seg-note').textContent = `${MODES[settings.mode].note} ${lvl().note}`;
@@ -2018,6 +2420,14 @@ function syncSettingsUI() {
 }
 document.querySelectorAll('input[name="mode"], input[name="level"]').forEach((el) => {
   el.addEventListener('change', () => { if (el.checked) setSetting(el.name, el.value); });
+});
+document.querySelectorAll('input[name="lines"]').forEach((el) => {
+  el.addEventListener('change', () => {
+    if (!el.checked) return;
+    settings.lines = el.value;
+    store.set('hc-lines', el.value);
+    if (front && game.state !== 'aim') buildMarkings(front);
+  });
 });
 document.querySelectorAll('input[name="size"]').forEach((el) => {
   el.addEventListener('change', () => { if (el.checked) setSize(el.value); });
@@ -2071,6 +2481,8 @@ if (DEBUG) {
     court, refitFront, setSize, applyColor, respawnBall, menu, menuRows, drawMenu, menuMesh, xrPaddles, updatePalm, collidePaddle,
     THREE, scene, room, planeLines, renderer, menuCanvas, setTint, cycleColor, settings_: settings,
     shape, enterShape, startShape, updateShape, finishShape, wallPoint,
+    grab, canGrab, grabBall, releaseBall, setLook, placeBag, punchCheck, stepBag, isPunch,
+    get bag() { return bag; }, bagOff, bagVel, bagPivot, insideRect,
     set aimOverride(o) { aimOverride = o; },
     setDemoText(v) { showDemoText = v; headsetText = !v; dirty = true; },
     // tutorial recording: stop the live loop and step the game by hand with a fixed time step
