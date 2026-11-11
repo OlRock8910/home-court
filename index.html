@@ -254,6 +254,10 @@ import * as THREE from 'three';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 
 const DEBUG = new URLSearchParams(location.search).has('debug');
+// The headset only starts VR/MR for pages served over the web (https, or localhost while testing).
+// A downloaded copy opened from the Quest's Files app (content:// or file://) cannot.
+const SITE = 'olrock8910.github.io/home-court';
+const ON_WEB = location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(location.hostname);
 
 // ---------- storage (can be blocked; never required) ----------
 const store = {
@@ -1122,8 +1126,10 @@ function syncPlanes(frame, ref) {
     const rect = finishRect({ m, minX, maxX, minZ, maxZ, plane: pl });
     if (pl.orientation) rect.vertical = pl.orientation === 'vertical';
     const label = pl.semanticLabel || '';
-    const isFloor = !rect.vertical && rect.nW.y > 0 && (label === 'floor' || rect.h < 0.25);
-    if (isFloor && Math.abs(rect.h) < 0.3 && Math.abs(rect.h - floorY) > 0.005) { floorY = rect.h; floorMoved = true; }
+    // floor: labelled as one, or the lowest flat surface near where we expect the floor
+    const expect = noFloorSpace ? -1.5 : 0, near = noFloorSpace ? 0.8 : 0.3;
+    const isFloor = !rect.vertical && rect.nW.y > 0 && (label === 'floor' || rect.h < expect + 0.25);
+    if (isFloor && Math.abs(rect.h - expect) < near && Math.abs(rect.h - floorY) > 0.005) { floorY = rect.h; floorMoved = true; }
     if (old) dropPlane(pl, old);
     const outline = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.45 }));
     outline.matrixAutoUpdate = false;
@@ -1900,17 +1906,33 @@ function resize() {
 new ResizeObserver(resize).observe(stage);
 
 // ---------- starting the headset ----------
-let starting = false;
+let starting = false, noFloorSpace = false;
 async function startXR(type) {
   if (starting || renderer.xr.isPresenting) return;
   starting = true;
   initAudio();
   try {
-    const opts = type === 'immersive-ar'
-      ? { requiredFeatures: ['local-floor'], optionalFeatures: ['plane-detection', 'hand-tracking'] }
-      : { requiredFeatures: ['local-floor'], optionalFeatures: ['hand-tracking'] };
-    const session = await navigator.xr.requestSession(type, opts);
+    // Try the full set-up first, then simpler ones, so a headset that refuses one feature still starts.
+    const extras = type === 'immersive-ar' ? ['plane-detection', 'hand-tracking'] : ['hand-tracking'];
+    const attempts = [
+      { requiredFeatures: ['local-floor'], optionalFeatures: extras },
+      { optionalFeatures: ['local-floor', ...extras] },
+      { optionalFeatures: ['local-floor'] },
+      {},
+    ];
+    let session = null, lastErr = null;
+    for (const opts of attempts) {
+      try { session = await navigator.xr.requestSession(type, opts); break; }
+      catch (err) { lastErr = err; if (err && err.name !== 'NotSupportedError') break; }
+    }
+    if (!session) throw lastErr || new Error('This headset refused to start');
+    // Without a floor-level space, use the head-level one and guess the floor 1.5 m below the start position.
+    const hasFloor = !session.enabledFeatures || session.enabledFeatures.includes('local-floor');
+    renderer.xr.setReferenceSpaceType(hasFloor ? 'local-floor' : 'local');
+    noFloorSpace = !hasFloor;
     session.addEventListener('end', () => {
+      renderer.xr.setReferenceSpaceType('local-floor');
+      noFloorSpace = false;
       menu.open = false;
       menuMesh.visible = false;
       wasHidden = false;
@@ -1937,6 +1959,7 @@ async function startXR(type) {
     }
     if (type === 'immersive-ar') {
       setMode('ar');
+      if (noFloorSpace) floorY = -1.5;   // replaced as soon as the room scan reports the real floor
       front = null;
       rebuildColliders();
       game.score = 0;
@@ -1948,7 +1971,8 @@ async function startXR(type) {
       setTimeout(() => { if (game.state === 'serve') enterServe(); }, 400);  // re-centre once the head pose is known
     }
   } catch (e) {
-    setStatus(`The headset view could not start: ${e.message || e}`);
+    const tip = ON_WEB ? 'Close other VR apps, restart the Meta Quest Browser and try again.' : `Open the website instead: ${SITE}`;
+    setStatus(`The headset view could not start (${(e && e.message) || e}). ${tip}`);
   } finally {
     starting = false;
   }
@@ -1961,6 +1985,10 @@ function setStatus(text, ok = false) {
   statusEl.classList.toggle('ok', ok);
 }
 async function checkSupport() {
+  if (!ON_WEB) {
+    setStatus(`This is a downloaded copy, and the headset can't start VR from a file. Open the website instead: ${SITE}`);
+    return;
+  }
   if (!('xr' in navigator)) {
     setStatus('Open this page in the Meta Quest Browser to play in your room. The preview here works with a mouse.');
     return;
@@ -2005,7 +2033,9 @@ document.querySelectorAll('input[name="color"]').forEach((el) => {
 document.getElementById('tint').addEventListener('change', (e) => setTint(e.target.checked));
 document.getElementById('new-ball').addEventListener('click', () => { initAudio(); takeOver(); respawnBall(); });
 const urlEl = document.getElementById('url');
-urlEl.textContent = (location.origin + location.pathname).replace(/^https?:\/\//, '').replace(/index\.html$/, '');
+urlEl.textContent = ON_WEB && location.hostname !== 'localhost'
+  ? (location.origin + location.pathname).replace(/^https?:\/\//, '').replace(/index\.html$/, '')
+  : SITE;
 document.getElementById('copy').addEventListener('click', async (e) => {
   const btn = e.currentTarget;
   try {
